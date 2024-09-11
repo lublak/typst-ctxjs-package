@@ -5,7 +5,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 4 {
-        panic!("missing input output arguments, example: typstjs_bytecode name input.js output.")
+        panic!("missing input output arguments, example: ctxjs_module_bytecode_builder name input.js output.")
     }
 
     let name = &args[1];
