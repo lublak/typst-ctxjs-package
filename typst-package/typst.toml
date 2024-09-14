@@ -6,7 +6,6 @@ authors = ["lublak"]
 license = "MIT"
 description = "Run javascript in contexts."
 
-homepage = "https://github.com/lublak/typst-ctxjs-package"
 repository = "https://github.com/lublak/typst-ctxjs-package"
 
 keywords = [
