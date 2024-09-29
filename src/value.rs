@@ -71,6 +71,12 @@ impl<'js> rquickjs::FromJs<'js> for JSBytesValue {
 
                 Ok(JSBytesValue::Object(value))
             }
+            rquickjs::Type::Promise => v
+                .as_promise()
+                .ok_or_else(|| {
+                    rquickjs::Error::new_from_js(v.type_name(), rquickjs::Type::Promise.as_str())
+                })?
+                .finish(),
             t => Err(rquickjs::Error::new_from_js(t.as_str(), "JSBytesValue")),
         }
     }
