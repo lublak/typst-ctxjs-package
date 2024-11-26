@@ -137,4 +137,12 @@ impl JSBytesValue {
             )),
         }
     }
+    pub fn eval(self, eval_prefix: &String) -> Self {
+        if let JSBytesValue::String(value) = &self {
+            if !eval_prefix.is_empty() && value.starts_with(eval_prefix) {
+                panic!("TODO")
+            }
+        }
+        self
+    }
 }

@@ -1,6 +1,5 @@
 use std::{
-    collections::HashMap,
-    sync::{LazyLock, Mutex},
+    collections::HashMap, sync::{LazyLock, Mutex}
 };
 
 use rquickjs::{context::EvalOptions, function::Args, CatchResultExt, Context, Module, Runtime};
@@ -76,7 +75,10 @@ fn eval(ctx_name: &[u8], js: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 #[wasm_func]
-fn define_vars(ctx_name: &[u8], vars: &[u8]) -> Result<Vec<u8>, String> {
+fn define_vars(ctx_name: &[u8], vars: &[u8], eval_prefix: &[u8]) -> Result<Vec<u8>, String> {
+    let eval_prefix =
+        std::str::from_utf8(eval_prefix).map_err(|e| format!("failed to parse eval_prefix: {}", e.to_string()))?.to_string();
+
     let ctx = get_context(ctx_name)?;
 
     let variables: HashMap<String, value::JSBytesValue> = ciborium::from_reader(vars)
@@ -86,7 +88,7 @@ fn define_vars(ctx_name: &[u8], vars: &[u8]) -> Result<Vec<u8>, String> {
         let variables: String = variables
             .into_iter()
             .map::<Result<String, String>, _>(|(k, v)| {
-                Ok(format!("let {}={}", k, v.to_value_string()?))
+                Ok(format!("let {}={}", k, v.eval(&eval_prefix).to_value_string()?))
             })
             .collect::<Result<Vec<String>, String>>()?
             .join(";");
@@ -100,7 +102,10 @@ fn define_vars(ctx_name: &[u8], vars: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 #[wasm_func]
-fn eval_format(ctx_name: &[u8], js: &[u8], args: &[u8]) -> Result<Vec<u8>, String> {
+fn eval_format(ctx_name: &[u8], js: &[u8], args: &[u8], eval_prefix: &[u8]) -> Result<Vec<u8>, String> {
+    let eval_prefix =
+        std::str::from_utf8(eval_prefix).map_err(|e| format!("failed to parse eval_prefix: {}", e.to_string()))?.to_string();
+
     let js =
         std::str::from_utf8(js).map_err(|e| format!("failed to parse js: {}", e.to_string()))?;
 
@@ -112,7 +117,7 @@ fn eval_format(ctx_name: &[u8], js: &[u8], args: &[u8]) -> Result<Vec<u8>, Strin
     let res: Result<JSBytesValue, String> = ctx.with(|ctx| {
         let arguments = arguments
             .into_iter()
-            .map::<Result<(String, String), String>, _>(|(k, v)| Ok((k, v.to_value_string()?)))
+            .map::<Result<(String, String), String>, _>(|(k, v)| Ok((k, v.eval(&eval_prefix).to_value_string()?)))
             .collect::<Result<HashMap<String, String>, String>>()?;
         let mut options = EvalOptions::default();
         options.global = true;
@@ -131,7 +136,10 @@ fn eval_format(ctx_name: &[u8], js: &[u8], args: &[u8]) -> Result<Vec<u8>, Strin
 }
 
 #[wasm_func]
-fn call_function(ctx_name: &[u8], fn_name: &[u8], args: &[u8]) -> Result<Vec<u8>, String> {
+fn call_function(ctx_name: &[u8], fn_name: &[u8], args: &[u8], eval_prefix: &[u8]) -> Result<Vec<u8>, String> {
+    let eval_prefix =
+        std::str::from_utf8(eval_prefix).map_err(|e| format!("failed to parse eval_prefix: {}", e.to_string()))?.to_string();
+        
     let fn_name: &str = std::str::from_utf8(fn_name)
         .map_err(|e| format!("failed to parse fn_name: {}", e.to_string()))?;
 
@@ -144,7 +152,7 @@ fn call_function(ctx_name: &[u8], fn_name: &[u8], args: &[u8]) -> Result<Vec<u8>
         let mut args = Args::new(ctx.clone(), arguments.len());
         for ele in arguments {
             _ = args
-                .push_arg(ele)
+                .push_arg(ele.eval(&eval_prefix))
                 .catch(&ctx)
                 .map_err(|e| format!("failed to add arg: {}", e.to_string()))?;
         }
@@ -234,7 +242,11 @@ fn call_module_function(
     module_name: &[u8],
     fn_name: &[u8],
     args: &[u8],
+    eval_prefix: &[u8],
 ) -> Result<Vec<u8>, String> {
+    let eval_prefix =
+        std::str::from_utf8(eval_prefix).map_err(|e| format!("failed to parse eval_prefix: {}", e.to_string()))?.to_string();
+
     let module_name: &str = std::str::from_utf8(module_name)
         .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
 
@@ -250,7 +262,7 @@ fn call_module_function(
         let mut args = Args::new(ctx.clone(), arguments.len());
         for ele in arguments {
             _ = args
-                .push_arg(ele)
+                .push_arg(ele.eval(&eval_prefix))
                 .catch(&ctx)
                 .map_err(|e| format!("failed to add arg: {}", e.to_string()))?;
         }
