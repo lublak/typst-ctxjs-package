@@ -55,10 +55,10 @@ fn get_context(ctx_name: &[u8]) -> Result<Context, String> {
 
 #[wasm_func]
 fn eval(ctx_name: &[u8], js: &[u8]) -> Result<Vec<u8>, String> {
+    let ctx = get_context(ctx_name)?;
+
     let js =
         std::str::from_utf8(js).map_err(|e| format!("failed to parse js: {}", e.to_string()))?;
-
-    let ctx = get_context(ctx_name)?;
 
     let res: Result<JSBytesValue, String> = ctx.with(|ctx| {
         let mut options = EvalOptions::default();
@@ -76,13 +76,13 @@ fn eval(ctx_name: &[u8], js: &[u8]) -> Result<Vec<u8>, String> {
 
 #[wasm_func]
 fn define_vars(ctx_name: &[u8], vars: &[u8], type_field: &[u8]) -> Result<Vec<u8>, String> {
-    let type_field =
-        std::str::from_utf8(type_field).map_err(|e| format!("failed to parse type_field: {}", e.to_string()))?.to_string();
-
     let ctx = get_context(ctx_name)?;
 
     let variables: HashMap<String, value::JSBytesValue> = ciborium::from_reader(vars)
         .map_err(|e| format!("failed to deserialize vars: {}", e.to_string()))?;
+
+    let type_field =
+        std::str::from_utf8(type_field).map_err(|e| format!("failed to parse type_field: {}", e.to_string()))?.to_string();
 
     ctx.with(|ctx| {
         let variables: String = variables
@@ -103,16 +103,16 @@ fn define_vars(ctx_name: &[u8], vars: &[u8], type_field: &[u8]) -> Result<Vec<u8
 
 #[wasm_func]
 fn eval_format(ctx_name: &[u8], js: &[u8], args: &[u8], type_field: &[u8]) -> Result<Vec<u8>, String> {
-    let type_field =
-        std::str::from_utf8(type_field).map_err(|e| format!("failed to parse type_field: {}", e.to_string()))?.to_string();
+    let ctx = get_context(ctx_name)?;
 
     let js =
         std::str::from_utf8(js).map_err(|e| format!("failed to parse js: {}", e.to_string()))?;
 
-    let ctx = get_context(ctx_name)?;
-
     let arguments: HashMap<String, value::JSBytesValue> = ciborium::from_reader(args)
         .map_err(|e| format!("failed to deserialize args: {}", e.to_string()))?;
+
+    let type_field =
+        std::str::from_utf8(type_field).map_err(|e| format!("failed to parse type_field: {}", e.to_string()))?.to_string();
 
     let res: Result<JSBytesValue, String> = ctx.with(|ctx| {
         let arguments = arguments
@@ -137,16 +137,16 @@ fn eval_format(ctx_name: &[u8], js: &[u8], args: &[u8], type_field: &[u8]) -> Re
 
 #[wasm_func]
 fn call_function(ctx_name: &[u8], fn_name: &[u8], args: &[u8], type_field: &[u8]) -> Result<Vec<u8>, String> {
-    let type_field =
-        std::str::from_utf8(type_field).map_err(|e| format!("failed to parse type_field: {}", e.to_string()))?.to_string();
-        
+    let ctx = get_context(ctx_name)?;
+
     let fn_name: &str = std::str::from_utf8(fn_name)
         .map_err(|e| format!("failed to parse fn_name: {}", e.to_string()))?;
 
-    let ctx = get_context(ctx_name)?;
-
     let arguments: Vec<value::JSBytesValue> = ciborium::from_reader(args)
         .map_err(|e| format!("failed to deserialize args: {}", e.to_string()))?;
+
+    let type_field =
+        std::str::from_utf8(type_field).map_err(|e| format!("failed to parse type_field: {}", e.to_string()))?.to_string();
 
     let res: Result<JSBytesValue, String> = ctx.with(|ctx| {
         let mut args = Args::new(ctx.clone(), arguments.len());
@@ -180,13 +180,13 @@ fn compile_module_bytecode(
     module_name: &[u8],
     module: &[u8],
 ) -> Result<Vec<u8>, String> {
+    let ctx = get_context(ctx_name)?;
+
     let module_name: &str = std::str::from_utf8(module_name)
         .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
 
     let module: &str = std::str::from_utf8(module)
         .map_err(|e| format!("failed to parse module: {}", e.to_string()))?;
-
-    let ctx = get_context(ctx_name)?;
 
     ctx.with(|ctx| {
         let m = Module::declare(ctx, module_name, module)
@@ -217,13 +217,13 @@ fn load_module_bytecode(ctx_name: &[u8], bytecode: &[u8]) -> Result<Vec<u8>, Str
 
 #[wasm_func]
 fn load_module_js(ctx_name: &[u8], module_name: &[u8], module: &[u8]) -> Result<Vec<u8>, String> {
+    let ctx = get_context(ctx_name)?;
+
     let module_name: &str = std::str::from_utf8(module_name)
         .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
 
     let module: &str = std::str::from_utf8(module)
         .map_err(|e| format!("failed to parse module: {}", e.to_string()))?;
-
-    let ctx = get_context(ctx_name)?;
 
     ctx.with(|ctx| {
         _ = Module::declare(ctx.clone(), module_name, module)
@@ -244,8 +244,7 @@ fn call_module_function(
     args: &[u8],
     type_field: &[u8],
 ) -> Result<Vec<u8>, String> {
-    let type_field =
-        std::str::from_utf8(type_field).map_err(|e| format!("failed to parse type_field: {}", e.to_string()))?.to_string();
+    let ctx = get_context(ctx_name)?;
 
     let module_name: &str = std::str::from_utf8(module_name)
         .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
@@ -253,10 +252,11 @@ fn call_module_function(
     let fn_name: &str = std::str::from_utf8(fn_name)
         .map_err(|e| format!("failed to parse fn_name: {}", e.to_string()))?;
 
-    let ctx = get_context(ctx_name)?;
-
     let arguments: Vec<value::JSBytesValue> = ciborium::from_reader(args)
         .map_err(|e| format!("failed to deserialize args: {}", e.to_string()))?;
+
+    let type_field =
+        std::str::from_utf8(type_field).map_err(|e| format!("failed to parse type_field: {}", e.to_string()))?.to_string();
 
     let res: Result<JSBytesValue, String> = ctx.with(|ctx| {
         let mut args = Args::new(ctx.clone(), arguments.len());
@@ -292,10 +292,10 @@ fn call_module_function(
 
 #[wasm_func]
 fn get_module_properties(ctx_name: &[u8], module_name: &[u8]) -> Result<Vec<u8>, String> {
+    let ctx = get_context(ctx_name)?;
+    
     let module_name: &str = std::str::from_utf8(module_name)
         .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
-
-    let ctx = get_context(ctx_name)?;
 
     let res: Result<Vec<String>, String> = ctx.with(|ctx| {
         let m: rquickjs::Object = Module::import(&ctx, module_name)
