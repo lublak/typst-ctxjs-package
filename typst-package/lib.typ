@@ -27,15 +27,15 @@
 }
 
 #let call-function(ctxname, fnname, args, type-field: "$type") = {
-  cbor.decode(ctxjs.call_function(string-to-bytes(ctxname), string-to-bytes(fnname), cbor.encode(args)))
+  cbor.decode(ctxjs.call_function(string-to-bytes(ctxname), string-to-bytes(fnname), cbor.encode(args), string-to-bytes(type-field)))
 }
 
 #let define-vars(ctxname, vars, type-field: "$type") = {
-  cbor.decode(ctxjs.define_vars(string-to-bytes(ctxname), cbor.encode(vars)))
+  cbor.decode(ctxjs.define_vars(string-to-bytes(ctxname), cbor.encode(vars), string-to-bytes(type-field)))
 }
 
 #let eval-format(ctxname, js, args, type-field: "$type") = {
-  cbor.decode(ctxjs.eval_format(string-to-bytes(ctxname), string-to-bytes(js), cbor.encode(args)))
+  cbor.decode(ctxjs.eval_format(string-to-bytes(ctxname), string-to-bytes(js), cbor.encode(args), string-to-bytes(type-field)))
 }
 
 #let load-module-bytecode(ctxname, bytecode) = {
@@ -47,7 +47,7 @@
 }
 
 #let call-module-function(ctxname, modulename, fnname, args, type-field: "$type") = {
-  cbor.decode(ctxjs.call_module_function(string-to-bytes(ctxname), string-to-bytes(modulename), string-to-bytes(fnname), cbor.encode(args)))
+  cbor.decode(ctxjs.call_module_function(string-to-bytes(ctxname), string-to-bytes(modulename), string-to-bytes(fnname), cbor.encode(args), string-to-bytes(type-field)))
 }
 
 #let get-module-properties(ctxname, modulename) = {
