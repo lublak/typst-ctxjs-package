@@ -75,9 +75,9 @@ fn eval(ctx_name: &[u8], js: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 #[wasm_func]
-fn define_vars(ctx_name: &[u8], vars: &[u8], eval_prefix: &[u8]) -> Result<Vec<u8>, String> {
-    let eval_prefix =
-        std::str::from_utf8(eval_prefix).map_err(|e| format!("failed to parse eval_prefix: {}", e.to_string()))?.to_string();
+fn define_vars(ctx_name: &[u8], vars: &[u8], type_field: &[u8]) -> Result<Vec<u8>, String> {
+    let type_field =
+        std::str::from_utf8(type_field).map_err(|e| format!("failed to parse type_field: {}", e.to_string()))?.to_string();
 
     let ctx = get_context(ctx_name)?;
 
@@ -88,7 +88,7 @@ fn define_vars(ctx_name: &[u8], vars: &[u8], eval_prefix: &[u8]) -> Result<Vec<u
         let variables: String = variables
             .into_iter()
             .map::<Result<String, String>, _>(|(k, v)| {
-                Ok(format!("let {}={}", k, v.eval(&eval_prefix).to_value_string()?))
+                Ok(format!("let {}={}", k, v.to_value_string(&ctx, &type_field)?))
             })
             .collect::<Result<Vec<String>, String>>()?
             .join(";");
@@ -102,9 +102,9 @@ fn define_vars(ctx_name: &[u8], vars: &[u8], eval_prefix: &[u8]) -> Result<Vec<u
 }
 
 #[wasm_func]
-fn eval_format(ctx_name: &[u8], js: &[u8], args: &[u8], eval_prefix: &[u8]) -> Result<Vec<u8>, String> {
-    let eval_prefix =
-        std::str::from_utf8(eval_prefix).map_err(|e| format!("failed to parse eval_prefix: {}", e.to_string()))?.to_string();
+fn eval_format(ctx_name: &[u8], js: &[u8], args: &[u8], type_field: &[u8]) -> Result<Vec<u8>, String> {
+    let type_field =
+        std::str::from_utf8(type_field).map_err(|e| format!("failed to parse type_field: {}", e.to_string()))?.to_string();
 
     let js =
         std::str::from_utf8(js).map_err(|e| format!("failed to parse js: {}", e.to_string()))?;
@@ -117,7 +117,7 @@ fn eval_format(ctx_name: &[u8], js: &[u8], args: &[u8], eval_prefix: &[u8]) -> R
     let res: Result<JSBytesValue, String> = ctx.with(|ctx| {
         let arguments = arguments
             .into_iter()
-            .map::<Result<(String, String), String>, _>(|(k, v)| Ok((k, v.eval(&eval_prefix).to_value_string()?)))
+            .map::<Result<(String, String), String>, _>(|(k, v)| Ok((k, v.to_value_string(&ctx, &type_field)?)))
             .collect::<Result<HashMap<String, String>, String>>()?;
         let mut options = EvalOptions::default();
         options.global = true;
@@ -136,9 +136,9 @@ fn eval_format(ctx_name: &[u8], js: &[u8], args: &[u8], eval_prefix: &[u8]) -> R
 }
 
 #[wasm_func]
-fn call_function(ctx_name: &[u8], fn_name: &[u8], args: &[u8], eval_prefix: &[u8]) -> Result<Vec<u8>, String> {
-    let eval_prefix =
-        std::str::from_utf8(eval_prefix).map_err(|e| format!("failed to parse eval_prefix: {}", e.to_string()))?.to_string();
+fn call_function(ctx_name: &[u8], fn_name: &[u8], args: &[u8], type_field: &[u8]) -> Result<Vec<u8>, String> {
+    let type_field =
+        std::str::from_utf8(type_field).map_err(|e| format!("failed to parse type_field: {}", e.to_string()))?.to_string();
         
     let fn_name: &str = std::str::from_utf8(fn_name)
         .map_err(|e| format!("failed to parse fn_name: {}", e.to_string()))?;
@@ -152,7 +152,7 @@ fn call_function(ctx_name: &[u8], fn_name: &[u8], args: &[u8], eval_prefix: &[u8
         let mut args = Args::new(ctx.clone(), arguments.len());
         for ele in arguments {
             _ = args
-                .push_arg(ele.eval(&eval_prefix))
+                .push_arg(ele.to_js(&ctx, &type_field)?)
                 .catch(&ctx)
                 .map_err(|e| format!("failed to add arg: {}", e.to_string()))?;
         }
@@ -242,10 +242,10 @@ fn call_module_function(
     module_name: &[u8],
     fn_name: &[u8],
     args: &[u8],
-    eval_prefix: &[u8],
+    type_field: &[u8],
 ) -> Result<Vec<u8>, String> {
-    let eval_prefix =
-        std::str::from_utf8(eval_prefix).map_err(|e| format!("failed to parse eval_prefix: {}", e.to_string()))?.to_string();
+    let type_field =
+        std::str::from_utf8(type_field).map_err(|e| format!("failed to parse type_field: {}", e.to_string()))?.to_string();
 
     let module_name: &str = std::str::from_utf8(module_name)
         .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
@@ -262,7 +262,7 @@ fn call_module_function(
         let mut args = Args::new(ctx.clone(), arguments.len());
         for ele in arguments {
             _ = args
-                .push_arg(ele.eval(&eval_prefix))
+                .push_arg(ele.to_js(&ctx, &type_field)?)
                 .catch(&ctx)
                 .map_err(|e| format!("failed to add arg: {}", e.to_string()))?;
         }

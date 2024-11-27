@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rquickjs::FromIteratorJs;
+use rquickjs::{context::EvalOptions, CatchResultExt};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -82,33 +82,8 @@ impl<'js> rquickjs::FromJs<'js> for JSBytesValue {
     }
 }
 
-impl<'js> rquickjs::IntoJs<'js> for JSBytesValue {
-    fn into_js(self, ctx: &rquickjs::Ctx<'js>) -> Result<rquickjs::Value<'js>, rquickjs::Error> {
-        match self {
-            JSBytesValue::Uninitialized => Ok(rquickjs::Value::new_uninitialized(ctx.clone())),
-            JSBytesValue::Undefined => Ok(rquickjs::Value::new_undefined(ctx.clone())),
-            JSBytesValue::Null => Ok(rquickjs::Value::new_null(ctx.clone())),
-            JSBytesValue::Bool(value) => Ok(rquickjs::Value::new_bool(ctx.clone(), value)),
-            JSBytesValue::Int(value) => Ok(rquickjs::Value::new_int(ctx.clone(), value)),
-            JSBytesValue::Float(value) => Ok(rquickjs::Value::new_float(ctx.clone(), value)),
-            JSBytesValue::String(value) => {
-                rquickjs::String::from_str(ctx.clone(), &value).map(rquickjs::Value::from_string)
-            }
-            JSBytesValue::Array(value) => {
-                rquickjs::Array::from_iter_js(ctx, value.into_iter().map(|v| v.into_js(ctx)))
-                    .map(rquickjs::Value::from_array)
-            }
-            JSBytesValue::Object(value) => rquickjs::Object::from_iter_js(
-                ctx,
-                value.iter().map(|(k, v)| (k, v.to_owned().into_js(ctx))),
-            )
-            .map(rquickjs::Value::from_object),
-        }
-    }
-}
-
 impl JSBytesValue {
-    pub fn to_value_string(self) -> Result<String, String> {
+    pub fn to_value_string<'js>(self, ctx: &rquickjs::Ctx<'js>, type_field: &String) -> Result<String, String> {
         match self {
             JSBytesValue::Uninitialized => Ok("null".to_string()),
             JSBytesValue::Undefined => Ok("null".to_string()),
@@ -121,28 +96,98 @@ impl JSBytesValue {
                 "[{}]",
                 value
                     .into_iter()
-                    .map(|v| v.to_value_string())
+                    .map(|v| v.to_value_string(ctx, type_field))
                     .collect::<Result<Vec<String>, _>>()?
                     .join(", ")
             )),
-            JSBytesValue::Object(value) => Ok(format!(
+            JSBytesValue::Object(value) => {
+                if let Some(type_field_value) = value.get(type_field) {
+                    if let JSBytesValue::String(type_field_value) = type_field_value {
+                        match type_field_value.as_ref() {
+                            "eval" => {
+                                if let Some(JSBytesValue::String(js)) = value.get(type_field) {
+                                    let mut options = EvalOptions::default();
+                                    options.global = true;
+                                    return ctx.eval_with_options::<JSBytesValue, _>(js.to_owned(), options)
+                                    .catch(&ctx)
+                                    .map(|v| v.to_value_string(ctx, type_field))
+                                    .map_err(|e| format!("eval error: {}", e.to_string()))?
+                                } else {
+                                    return Err("eval typed values needs to be a string".to_string())
+                                }
+                            }
+                            t => {
+                                return Err(format!("invalid type:{}", t))
+                            }
+                        }
+                    } else {
+                        return Err(format!("{} is not a string value", type_field))
+                    }
+                }
+                Ok(format!(
                 "{{{}}}",
                 value
                     .into_iter()
                     .map::<Result<String, String>, _>(|(k, v)| {
-                        Ok(format!("{}:{}", k, v.to_value_string()?))
+                        Ok(format!("{}:{}", k, v.to_value_string(ctx, type_field)?))
                     })
                     .collect::<Result<Vec<String>, _>>()?
                     .join(", ")
-            )),
+            ))
+        },
         }
     }
-    pub fn eval(self, eval_prefix: &String) -> Self {
-        if let JSBytesValue::String(value) = &self {
-            if !eval_prefix.is_empty() && value.starts_with(eval_prefix) {
-                panic!("TODO")
+
+    pub fn to_js<'js>(self, ctx: &rquickjs::Ctx<'js>, type_field: &String) -> Result<rquickjs::Value<'js>, String> {
+        match self {
+            JSBytesValue::Uninitialized => Ok(rquickjs::Value::new_uninitialized(ctx.clone())),
+            JSBytesValue::Undefined => Ok(rquickjs::Value::new_undefined(ctx.clone())),
+            JSBytesValue::Null => Ok(rquickjs::Value::new_null(ctx.clone())),
+            JSBytesValue::Bool(value) => Ok(rquickjs::Value::new_bool(ctx.clone(), value)),
+            JSBytesValue::Int(value) => Ok(rquickjs::Value::new_int(ctx.clone(), value)),
+            JSBytesValue::Float(value) => Ok(rquickjs::Value::new_float(ctx.clone(), value)),
+            JSBytesValue::String(value) => {
+                rquickjs::String::from_str(ctx.clone(), &value).map(rquickjs::Value::from_string).map_err(|e| e.to_string())
             }
+            JSBytesValue::Array(value) => {
+                let array = rquickjs::Array::new(ctx.clone()).map_err(|e| e.to_string())?;
+                for (idx, item) in value.into_iter().enumerate() {
+                    let item = item.to_js(ctx, type_field)?;
+                    array.set(idx as _, item).map_err(|e| e.to_string())?;
+                }
+                Ok(rquickjs::Value::from_array(array))
+            }
+            JSBytesValue::Object(value) => {
+                if let Some(type_field_value) = value.get(type_field) {
+                    if let JSBytesValue::String(type_field_value) = type_field_value {
+                        match type_field_value.as_ref() {
+                            "eval" => {
+                                if let Some(JSBytesValue::String(js)) = value.get(type_field) {
+                                    let mut options = EvalOptions::default();
+                                    options.global = true;
+                                    return ctx.eval_with_options::<JSBytesValue, _>(js.to_owned(), options)
+                                    .catch(&ctx)
+                                    .map(|v| v.to_js(ctx, type_field))
+                                    .map_err(|e| format!("eval error: {}", e.to_string()))?
+                                } else {
+                                    return Err("eval typed values needs to be a string".to_string())
+                                }
+                            }
+                            t => {
+                                return Err(format!("invalid type:{}", t))
+                            }
+                        }
+                    } else {
+                        return Err(format!("{} is not a string value", type_field))
+                    }
+                }
+                let object = rquickjs::Object::new(ctx.clone()).map_err(|e| e.to_string())?;
+                for (key, value) in value {
+                    let value = value.to_js(ctx, type_field)?;
+                    object.set(key, value).map_err(|e| e.to_string())?;
+                }
+                Ok(rquickjs::Value::from_object(object))
+        },
         }
-        self
     }
 }
