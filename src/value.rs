@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rquickjs::{context::EvalOptions, CatchResultExt, Coerced, FromJs};
+use rquickjs::{context::EvalOptions, CatchResultExt};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -106,12 +106,7 @@ impl JSBytesValue {
                         match type_field_value.as_ref() {
                             "eval" => {
                                 if let Some(JSBytesValue::String(js)) = value.get("value") {
-                                    let mut options = EvalOptions::default();
-                                    options.global = true;
-                                    return ctx.eval_with_options::<rquickjs::Value, _>(js.to_owned(), options)
-                                    .catch(&ctx)
-                                    .map(|v| Coerced::<rquickjs::String<'js>>::from_js(ctx, v).map(|v| v.to_string().map_err(|e| e.to_string())).map_err(|e| e.to_string())?)
-                                    .map_err(|e| format!("eval error: {}", e.to_string()))?
+                                    return Ok(js.to_owned())
                                 } else {
                                     return Err("eval typed values needs to be a string".to_string())
                                 }
