@@ -2,6 +2,7 @@ use std::{
     collections::HashMap, sync::{LazyLock, Mutex}
 };
 
+use lz4_flex::{compress_prepend_size, decompress_size_prepended};
 use rquickjs::{context::EvalOptions, function::Args, CatchResultExt, Context, Module, Runtime};
 use value::JSBytesValue;
 use wasm_minimal_protocol::*;
@@ -179,6 +180,7 @@ fn compile_module_bytecode(
     ctx_name: &[u8],
     module_name: &[u8],
     module: &[u8],
+    compress: &[u8],
 ) -> Result<Vec<u8>, String> {
     let ctx = get_context(ctx_name)?;
 
@@ -188,31 +190,62 @@ fn compile_module_bytecode(
     let module: &str = std::str::from_utf8(module)
         .map_err(|e| format!("failed to parse module: {}", e.to_string()))?;
 
+    if compress.len() != 1 {
+        return Err("failed to parse compress: is not a one sized array".to_string())
+    }
+
+    let compress = compress[0] != 0;
+
     ctx.with(|ctx| {
         let m = Module::declare(ctx, module_name, module)
             .map_err(|e| format!("failed declare module: {}", e.to_string()))?;
         let byte_code = m
             .write(false)
             .map_err(|e| format!("failed to get bytecode: {}", e.to_string()))?;
+        if compress {
+            return Ok(compress_prepend_size(&byte_code))
+        }
         Ok(byte_code)
     })
 }
 
 #[wasm_func]
-fn load_module_bytecode(ctx_name: &[u8], bytecode: &[u8]) -> Result<Vec<u8>, String> {
+fn load_module_bytecode(ctx_name: &[u8], bytecode: &[u8], compressed: &[u8]) -> Result<Vec<u8>, String> {
     let ctx = get_context(ctx_name)?;
 
-    ctx.with(|ctx| {
-        let m = unsafe { Module::load(ctx.clone(), bytecode) }
-            .catch(&ctx)
-            .map_err(|e| format!("failed load bytecode: {}", e.to_string()))?;
-        _ = m
-            .eval()
-            .catch(&ctx)
-            .map_err(|e| format!("failed eval bytecode: {}", e.to_string()))?;
+    if compressed.len() != 1 {
+        return Err("failed to parse compress: is not a one sized array".to_string())
+    }
 
-        Ok(vec![])
-    })
+    let compressed = compressed[0] != 0;
+
+    if compressed {
+        let bytecode = decompress_size_prepended(bytecode).map_err(|e| e.to_string())?;
+
+        ctx.with(|ctx| {
+            let m = unsafe { Module::load(ctx.clone(), &bytecode) }
+                .catch(&ctx)
+                .map_err(|e| format!("failed load bytecode: {}", e.to_string()))?;
+            _ = m
+                .eval()
+                .catch(&ctx)
+                .map_err(|e| format!("failed eval bytecode: {}", e.to_string()))?;
+    
+            Ok(vec![])
+        })
+    } else {
+        ctx.with(|ctx| {
+            let m = unsafe { Module::load(ctx.clone(), &bytecode) }
+                .catch(&ctx)
+                .map_err(|e| format!("failed load bytecode: {}", e.to_string()))?;
+            _ = m
+                .eval()
+                .catch(&ctx)
+                .map_err(|e| format!("failed eval bytecode: {}", e.to_string()))?;
+    
+            Ok(vec![])
+        })
+    }
 }
 
 #[wasm_func]

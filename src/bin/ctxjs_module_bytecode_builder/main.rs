@@ -1,3 +1,4 @@
+use lz4_flex::compress_prepend_size;
 use rquickjs::{Context, Module, Runtime};
 use std::{env, fs};
 
@@ -12,6 +13,12 @@ fn main() {
     let input = &args[2];
     let output = &args[3];
 
+    let mut compress = false;
+
+    if args.len() > 4 {
+        compress = &args[4] == "true";
+    }
+
     let source = fs::read_to_string(input).unwrap();
 
     let rt = Runtime::new().unwrap();
@@ -21,5 +28,9 @@ fn main() {
         let byte_code = m.write(false).unwrap();
         byte_code
     });
-    fs::write(output, byte_code).unwrap();
+    if compress {
+        fs::write(output, compress_prepend_size(&byte_code)).unwrap();
+    } else {
+        fs::write(output, &byte_code).unwrap();
+    }
 }
