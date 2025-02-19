@@ -14,7 +14,7 @@ A typst plugin to evaluate javascript code.
 ## Example
 
 ```typst
-#import "@preview/ctxjs:0.2.0"
+#import "@preview/ctxjs:0.3.0"
 
 #{
   _ = ctxjs.create-context("context_name")

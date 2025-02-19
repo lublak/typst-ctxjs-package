@@ -1,6 +1,6 @@
 [package]
 name = "ctxjs"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 [lib]
@@ -11,9 +11,9 @@ name = "ctxjs_module_bytecode_builder"
 path = "src/bin/ctxjs_module_bytecode_builder/main.rs"
 
 [dependencies]
-rquickjs = "0.8.1"
+rquickjs = "0.9.0"
 ciborium = "0.2.2"
-serde = "1.0.209"
+serde = "1.0.217"
 serde_bytes = "0.11.15"
 wasm-minimal-protocol = { git = "https://github.com/astrale-sharp/wasm-minimal-protocol" }
 strfmt = "0.2.4"
