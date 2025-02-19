@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::value;
 
 #[derive(Clone, Serialize, Deserialize)]
-#[serde(tag = "method", content = "args")]
+#[serde(tag = "method", content = "arguments")]
 pub(crate) enum Method {
     Eval(String),
     EvalFormat(String, HashMap<String, value::JSBytesValue>, String),

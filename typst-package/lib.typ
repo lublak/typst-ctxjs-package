@@ -1,65 +1,8 @@
 #let ctxjs = plugin("ctxjs.wasm")
 
+#import "load.typ" as load
 #import "ctx.typ" as ctx
 
-#let string-to-bytes(data) = {
-  let data = data
-  if type(data) == str {
-    data = bytes(data)
-  } else if type(data) == array {
-    data = bytes(data)
-  } else if type(data) == content {
-    data = bytes(data.text)
-  }
-  data
-}
-
-#let eval-later(js, type-field: "$type") = {
-  let o = (value: js)
-  o.insert(type-field, "eval")
-  return o
-}
-
-#let new-context(load) = {
-  for b in init {
-    
-  }
-
-  plugin.transition(ctxjs.new_context, ())
-}
-
-#let load(load) = {
-  return plugin.transition(ctxjs.load, ())
-}
-
-#let eval(js) = {
-  return cbor(ctxjs.eval(string-to-bytes(js)))
-}
-
-#let eval-format(js, args, type-field: "$type") = {
-  return cbor(ctxjs.eval_format(string-to-bytes(js), cbor.encode(args), string-to-bytes(type-field)))
-}
-
-#let call-function(fnname, args, type-field: "$type") = {
-  return cbor(ctxjs.call_function(string-to-bytes(fnname), cbor.encode(args), string-to-bytes(type-field)))
-}
-
-#let define-vars(vars, type-field: "$type") = {
-  cbor(ctxjs.define_vars(cbor.encode(vars), string-to-bytes(type-field)))
-}
-
-#let load-module-bytecode(bytecode) = {
-  return plugin.transition(ctxjs.load_module_bytecode, bytecode)
-}
-
-#let load-module-js(modulename, module) = {
-  return plugin.transition(ctxjs.load_module_js, string-to-bytes(modulename), string-to-bytes(module))
-}
-
-#let call-module-function(modulename, fnname, args, type-field: "$type") = {
-  return cbor(ctxjs.call_module_function(string-to-bytes(modulename), string-to-bytes(fnname), cbor.encode(args), string-to-bytes(type-field)))
-}
-
-#let get-module-properties(modulename) = {
-  return cbor(ctxjs.get_module_properties(string-to-bytes(modulename)))
+#let new-context(load: ()) = {
+  return plugin.transition(ctxjs.new_context, cbor.encode(load))
 }

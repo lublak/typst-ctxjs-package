@@ -1,47 +1,39 @@
-#let eval(js) = {
-  return (ctxjs) => {
-    cbor(ctxjs.eval(string-to-bytes(js)))
-  }
+#import "helpers.typ"
+
+#let eval-later = helpers.eval-later
+
+#let load(ctxjs, load) = {
+  return plugin.transition(ctxjs.load, cbor.encode(load))
 }
 
-#let call-function(fnname, args, type-field: "$type") = {
-  return (ctxjs) => {
-    cbor(ctxjs.call_function(string-to-bytes(fnname), cbor.encode(args), string-to-bytes(type-field)))
-  }
+#let eval(ctxjs, js) = {
+  return cbor(ctxjs.eval(helpers.string-to-bytes(js)))
 }
 
-#let define-vars(vars, type-field: "$type") = {
-  return (ctxjs) => {
-    cbor(ctxjs.define_vars(cbor.encode(vars), string-to-bytes(type-field)))
-  }
+#let eval-format(ctxjs, js, args, type-field: "$type") = {
+  return cbor(ctxjs.eval_format(helpers.string-to-bytes(js), cbor.encode(args), helpers.string-to-bytes(type-field)))
 }
 
-#let eval-format(js, args, type-field: "$type") = {
-  return (ctxjs) => {
-    cbor(ctxjs.eval_format(string-to-bytes(js), cbor.encode(args), string-to-bytes(type-field)))
-  }
+#let call-function(ctxjs, fnname, args, type-field: "$type") = {
+  return cbor(ctxjs.call_function(helpers.string-to-bytes(fnname), cbor.encode(args), helpers.string-to-bytes(type-field)))
 }
 
-#let load-module-bytecode(bytecode) = {
-  return (ctxjs) => {
-    ctxjs.load_module_bytecode(bytecode)
-  }
+#let define-vars(ctxjs, vars, type-field: "$type") = {
+  cbor(ctxjs.define_vars(cbor.encode(vars), helpers.string-to-bytes(type-field)))
 }
 
-#let load-module-js(modulename, module) = {
-  return (ctxjs) => {
-    ctxjs.load_module_js(string-to-bytes(modulename), string-to-bytes(module))
-  }
+#let load-module-bytecode(ctxjs, bytecode) = {
+  return plugin.transition(ctxjs.load_module_bytecode, bytecode)
 }
 
-#let call-module-function(modulename, fnname, args, type-field: "$type") = {
-  return (ctxjs) => {
-    cbor(ctxjs.call_module_function(string-to-bytes(modulename), string-to-bytes(fnname), cbor.encode(args), string-to-bytes(type-field)))
-  }
+#let load-module-js(ctxjs, modulename, module) = {
+  return plugin.transition(ctxjs.load_module_js, helpers.string-to-bytes(modulename), helpers.string-to-bytes(module))
 }
 
-#let get-module-properties(modulename) = {
-  return (ctxjs) => {
-    cbor(ctxjs.get_module_properties(string-to-bytes(modulename)))
-  }
+#let call-module-function(ctxjs, modulename, fnname, args, type-field: "$type") = {
+  return cbor(ctxjs.call_module_function(helpers.string-to-bytes(modulename), helpers.string-to-bytes(fnname), cbor.encode(args), helpers.string-to-bytes(type-field)))
+}
+
+#let get-module-properties(ctxjs, modulename) = {
+  return cbor(ctxjs.get_module_properties(helpers.string-to-bytes(modulename)))
 }

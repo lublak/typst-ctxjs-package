@@ -18,14 +18,14 @@ unsafe impl Sync for ContextHolder {}
 static CURRENT_CONTEXT: Mutex<ContextHolder> = Mutex::new(ContextHolder(None));
 
 #[wasm_func]
-fn new_context(init: &[u8]) -> Result<Vec<u8>, String> {
+fn new_context(load: &[u8]) -> Result<Vec<u8>, String> {
     let runtime =
         Runtime::new().map_err(|e| format!("failed to create runtime: {}", e.to_string()))?;
 
     let ctx: Context = Context::full(&runtime)
         .map_err(|e| format!("failed to create context: {}", e.to_string()))?;
 
-    run_load(&ctx, init)?;
+    run_load(&ctx, load)?;
 
     CURRENT_CONTEXT
         .lock()
@@ -49,23 +49,26 @@ fn get_current_context() -> Result<Context, String> {
         .ok_or_else(|| "context empty")?);
 }
 
-fn run_load(ctx: &Context, run: &[u8]) -> Result<Vec<u8>, String> {
-    let run: Vec<load::Method> = ciborium::from_reader(run)
-        .map_err(|e| format!("failed to deserialize args: {}", e.to_string()))?;
+fn run_load(ctx: &Context, load: &[u8]) -> Result<Vec<u8>, String> {
+    let load: Vec<load::Method> = ciborium::from_reader(load)
+        .map_err(|e| format!("failed to deserialize load: {}", e.to_string()))?;
 
-    for ele in run {
+    for ele in load {
         match ele {
             load::Method::Eval(js) => {
-                _ = ctx.with(|ctx| -> Result<Vec<u8>, String> {
+                let res: Result<JSBytesValue, String> = ctx.with(|ctx| {
                     let mut options = EvalOptions::default();
                     options.global = true;
                     ctx.eval_with_options(js, options)
                         .catch(&ctx)
                         .map_err(|e| format!("eval error: {}", e.to_string()))
-                })?;
+                });
+                if let Err(err) = res {
+                    return Err(err);
+                }
             }
             load::Method::EvalFormat(js, arguments, type_field) => {
-                _ = ctx.with(|ctx| -> Result<Vec<u8>, String> {
+                let res: Result<JSBytesValue, String> = ctx.with(|ctx| {
                     let arguments = arguments
                         .into_iter()
                         .map::<Result<(String, String), String>, _>(|(k, v)| {
@@ -81,7 +84,10 @@ fn run_load(ctx: &Context, run: &[u8]) -> Result<Vec<u8>, String> {
                     )
                     .catch(&ctx)
                     .map_err(|e| format!("eval error: {}", e.to_string()))
-                })?;
+                });
+                if let Err(err) = res {
+                    return Err(err);
+                }
             }
             load::Method::DefineVars(variables, type_field) => {
                 _ = ctx.with(|ctx| -> Result<Vec<u8>, String> {
@@ -150,7 +156,7 @@ fn run_load(ctx: &Context, run: &[u8]) -> Result<Vec<u8>, String> {
                 })?;
             }
             load::Method::CallModuleFunction(module_name, fn_name, arguments, type_field) => {
-                _ = ctx.with(|ctx| -> Result<Vec<u8>, String> {
+                let res: Result<JSBytesValue, String> = ctx.with(|ctx| {
                     let mut args = Args::new(ctx.clone(), arguments.len());
                     for ele in arguments {
                         _ = args
@@ -176,7 +182,11 @@ fn run_load(ctx: &Context, run: &[u8]) -> Result<Vec<u8>, String> {
                     func.call_arg(args)
                         .catch(&ctx)
                         .map_err(|e| format!("failed to call function: {}", e.to_string()))
-                })?;
+                });
+
+                if let Err(err) = res {
+                    return Err(err);
+                }
             }
         }
     }
