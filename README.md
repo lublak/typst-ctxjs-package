@@ -15,18 +15,23 @@ A typst plugin to evaluate javascript code.
 
 ```typst
 #import "@preview/ctxjs:0.3.0"
+#import ctxjs.load
+#import ctxjs.ctx
 
 #{
-  _ = ctxjs.create-context("context_name")
-  let test = ctxjs.eval("context_name", "function test(data) {return data + 2;}")
-  let returns-4 = ctxjs.call-function("context_name", "test", (2,))
-  let returns-6 = ctxjs.eval-format("context_name", "test({test})", (test: 4))
+  let newcontext = ctxjs.new-context(
+    (
+      load.eval("function test(data) {return data + 2;}"),
+    )
+  )
+  let returns-4 = ctx.call-function(newcontext, "test", (2,))
+  let returns-6 = ctx.eval-format(newcontext, "test({test})", (test: 4))
   let code = ```
     export function another_test_function() { return {data: 'test'}; }
   ```;
-  _ = ctxjs.load-module-js("context_name", "module_name", code.text)
-  let returns-array-with-another-test = ctxjs.get-module-properties("context_name", "module_name")
-  let returns-data-with-test-string = ctxjs.call-module-function("context_name", "module_name", "another_test_function", ())
-  let returns-8 = ctxjs.eval-format("context_name", "test({test})", (test: ctxjs.eval-later("4 + 4")))
+  let anothernewcontext = ctx.load-module-js(newcontext, "module_name", code.text)
+  let returns-array-with-another-test = ctx.get-module-properties(anothernewcontext, "module_name")
+  let returns-data-with-test-string = ctx.call-module-function(anothernewcontext, "module_name", "another_test_function", ())
+  let returns-8 = ctx.eval-format(anothernewcontext, "test({test})", (test: ctx.eval-later("4 + 4")))
 }
 ```
