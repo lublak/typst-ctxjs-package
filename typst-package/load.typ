@@ -19,7 +19,7 @@
 }
 
 #let load-module-bytecode(bytecode) = {
-  return ("method": "LoadModuleBytecode", arguments: (bytecode,))
+  return ("method": "LoadModuleBytecode", arguments: bytecode)
 }
 
 #let load-module-js(modulename, module) = {
