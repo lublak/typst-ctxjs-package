@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Mutex};
+use std::collections::HashMap;
 
 use rquickjs::{context::EvalOptions, function::Args, CatchResultExt, Context, Module, Runtime};
 use value::JSBytesValue;
@@ -15,7 +15,7 @@ struct ContextHolder(Option<Context>);
 unsafe impl Send for ContextHolder {}
 unsafe impl Sync for ContextHolder {}
 
-static CURRENT_CONTEXT: Mutex<ContextHolder> = Mutex::new(ContextHolder(None));
+static mut CURRENT_CONTEXT: ContextHolder = ContextHolder(None);
 
 #[wasm_func]
 fn new_context(load: &[u8]) -> Result<Vec<u8>, String> {
@@ -27,26 +27,17 @@ fn new_context(load: &[u8]) -> Result<Vec<u8>, String> {
 
     run_load(&ctx, load)?;
 
-    CURRENT_CONTEXT
-        .lock()
-        .map_err(|e| format!("failed to load context store: {}", e.to_string()))?
-        .0 = Some(ctx);
+    unsafe {
+        CURRENT_CONTEXT.0 = Some(ctx);
+    }
 
     Ok(vec![])
 }
 
 #[inline(always)]
+#[allow(static_mut_refs)]
 fn get_current_context() -> Result<Context, String> {
-    return Ok(CURRENT_CONTEXT
-        .lock()
-        .map_err(
-            |e: std::sync::PoisonError<std::sync::MutexGuard<'_, ContextHolder>>| {
-                format!("failed to load context store: {}", e.to_string())
-            },
-        )?
-        .0
-        .to_owned()
-        .ok_or_else(|| "context empty")?);
+    return Ok(unsafe { CURRENT_CONTEXT.0.to_owned().ok_or_else(|| "context empty") }?);
 }
 
 fn run_load(ctx: &Context, load: &[u8]) -> Result<Vec<u8>, String> {
