@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use base64::Engine as _;
 use rquickjs::{context::EvalOptions, function::Args, CatchResultExt, Context, Module, Runtime};
 use value::JSBytesValue;
 use wasm_minimal_protocol::*;
@@ -340,6 +341,7 @@ fn compile_module_bytecode(module_name: &[u8], module: &[u8]) -> Result<Vec<u8>,
         let byte_code = m
             .write(false)
             .map_err(|e| format!("failed to get bytecode: {}", e.to_string()))?;
+
         Ok(byte_code)
     })
 }
@@ -463,4 +465,26 @@ fn get_module_properties(module_name: &[u8]) -> Result<Vec<u8>, String> {
     _ = ciborium::ser::into_writer(&res?, &mut buffer)
         .map_err(|e| format!("failed to serialize results: {}", e.to_string()))?;
     Ok(buffer)
+}
+
+#[wasm_func]
+pub fn image_data_url(data: &[u8]) -> Result<Vec<u8>, String> {
+    let t: &str;
+    if infer::image::is_png(data) {
+        t = "png"
+    } else if infer::image::is_jpeg(data) {
+        t = "jpeg"
+    } else if infer::image::is_gif(data) {
+        t = "gif"
+    } else if infer::text::is_xml(data) {
+        t = "svg"
+    } else {
+        return Err("data not supported".to_owned());
+    }
+    Ok(format!(
+        "data:image/{};base64,{}",
+        t,
+        base64::prelude::BASE64_STANDARD.encode(&data)
+    )
+    .into_bytes())
 }

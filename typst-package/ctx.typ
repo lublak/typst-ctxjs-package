@@ -15,7 +15,11 @@
 }
 
 #let call-function(ctxjs, fnname, args, type-field: "$type") = {
-  return cbor(ctxjs.call_function(helpers.string-to-bytes(fnname), cbor.encode(args), helpers.string-to-bytes(type-field)))
+  return cbor(ctxjs.call_function(
+    helpers.string-to-bytes(fnname),
+    cbor.encode(args),
+    helpers.string-to-bytes(type-field),
+  ))
 }
 
 #let define-vars(ctxjs, vars, type-field: "$type") = {
@@ -31,7 +35,12 @@
 }
 
 #let call-module-function(ctxjs, modulename, fnname, args, type-field: "$type") = {
-  return cbor(ctxjs.call_module_function(helpers.string-to-bytes(modulename), helpers.string-to-bytes(fnname), cbor.encode(args), helpers.string-to-bytes(type-field)))
+  return cbor(ctxjs.call_module_function(
+    helpers.string-to-bytes(modulename),
+    helpers.string-to-bytes(fnname),
+    cbor.encode(args),
+    helpers.string-to-bytes(type-field),
+  ))
 }
 
 #let get-module-properties(ctxjs, modulename) = {

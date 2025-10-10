@@ -8,8 +8,9 @@ A typst plugin to evaluate javascript code.
 - formated evaluations (execute your code with your typst data)
 - call functions
 - call functions in modules
-- create bytecode with an extra tool (ctxjs_module_bytecode_builder)
+- create quickjs bytecode with an extra tool, to improve loading performance (ctxjs_module_bytecode_builder)
 - allow later evaluation of javascript code
+- convert images to data urls
 
 ## Example
 
@@ -19,6 +20,7 @@ A typst plugin to evaluate javascript code.
 #import ctxjs.ctx
 
 #{
+  let dataurl = ctxjs.image-data-url("path_or_bytes.png")
   let newcontext = ctxjs.new-context(
     (
       load.eval("function test(data) {return data + 2;}"),
