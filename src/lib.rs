@@ -474,17 +474,17 @@ pub fn image_data_url(data: &[u8], format: &[u8]) -> Result<Vec<u8>, String> {
 
     let t: &str;
     if format.is_empty() {
-    if infer::image::is_png(data) {
-        t = "png"
-    } else if infer::image::is_jpeg(data) {
-        t = "jpeg"
-    } else if infer::image::is_gif(data) {
-        t = "gif"
-    } else if infer::text::is_xml(data) {
-        t = "svg"
-    } else {
-        return Err("data not supported".to_owned());
-    }
+        if infer::image::is_png(data) {
+            t = "png"
+        } else if infer::image::is_jpeg(data) {
+            t = "jpeg"
+        } else if infer::image::is_gif(data) {
+            t = "gif"
+        } else if infer::text::is_xml(data) {
+            t = "svg"
+        } else {
+            return Err("data not supported".to_owned());
+        }
     } else {
         match format.to_lowercase().as_str() {
             "png" => t = "png",

@@ -4,6 +4,13 @@
   return o
 }
 
+#let json(json, type-field: "$type") = {
+  json = string-to-bytes(json)
+  let o = (value: json)
+  o.insert(type-field, "json")
+  return o
+}
+
 #let string-to-bytes(data) = {
   let data = data
   if type(data) == str {
