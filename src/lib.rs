@@ -468,8 +468,12 @@ fn get_module_properties(module_name: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 #[wasm_func]
-pub fn image_data_url(data: &[u8]) -> Result<Vec<u8>, String> {
+pub fn image_data_url(data: &[u8], format: &[u8]) -> Result<Vec<u8>, String> {
+    let format: &str = std::str::from_utf8(format)
+        .map_err(|e| format!("failed to parse format: {}", e.to_string()))?;
+
     let t: &str;
+    if format.is_empty() {
     if infer::image::is_png(data) {
         t = "png"
     } else if infer::image::is_jpeg(data) {
@@ -481,6 +485,16 @@ pub fn image_data_url(data: &[u8]) -> Result<Vec<u8>, String> {
     } else {
         return Err("data not supported".to_owned());
     }
+    } else {
+        match format.to_lowercase().as_str() {
+            "png" => t = "png",
+            "jpeg" => t = "jpeg",
+            "gif" => t = "gif",
+            "svg" => t = "svg",
+            _ => return Err(format!("format {} not supported", format)),
+        }
+    }
+
     Ok(format!(
         "data:image/{};base64,{}",
         t,
