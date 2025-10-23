@@ -2,6 +2,10 @@
 
 #let eval-later = helpers.eval-later
 
+#let json = helpers.json
+
+#let image-data-url = helpers.image-data-url
+
 #let load(ctxjs, load) = {
   return plugin.transition(ctxjs.load, cbor.encode(load))
 }

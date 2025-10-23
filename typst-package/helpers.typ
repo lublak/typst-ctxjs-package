@@ -24,3 +24,13 @@
   }
   data
 }
+
+#let image-data-url(data, format: auto) = {
+  if type(data) == str {
+    data = read(data, encoding: none)
+  }
+  if format == auto {
+    format = ""
+  }
+  return str(ctxjs.image_data_url(data))
+}

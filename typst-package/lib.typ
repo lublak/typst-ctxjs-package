@@ -7,12 +7,4 @@
   return plugin.transition(ctxjs.new_context, cbor.encode(load))
 }
 
-#let image-data-url(data, format: auto) = {
-  if type(data) == str {
-    data = read(data, encoding: none)
-  }
-  if format == auto {
-    format = ""
-  }
-  return str(ctxjs.image_data_url(data))
-}
+#let image-data-url = ctx.image-data-url
