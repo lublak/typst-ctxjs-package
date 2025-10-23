@@ -5,7 +5,9 @@
 }
 
 #let json(json, type-field: "$type") = {
-  json = string-to-bytes(json)
+  if type(json) == str {
+    json = read(json, encoding: none)
+  }
   let o = (value: json)
   o.insert(type-field, "json")
   return o
