@@ -105,8 +105,8 @@ impl JSBytesValue {
         type_field: &String,
     ) -> Result<String, String> {
         match self {
-            JSBytesValue::Uninitialized => Ok("null".to_string()),
-            JSBytesValue::Undefined => Ok("null".to_string()),
+            JSBytesValue::Uninitialized => Ok("undefined".to_string()),
+            JSBytesValue::Undefined => Ok("undefined".to_string()),
             JSBytesValue::Null => Ok("null".to_string()),
             JSBytesValue::Bool(value) => Ok(value.to_string()),
             JSBytesValue::Int(value) => Ok(value.to_string()),
