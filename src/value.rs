@@ -84,6 +84,21 @@ impl<'js> rquickjs::FromJs<'js> for JSBytesValue {
 }
 
 impl JSBytesValue {
+    pub fn to_type_string(&self) -> String {
+        return (match self {
+            JSBytesValue::Uninitialized => "Uninitialized",
+            JSBytesValue::Undefined => "Undefined",
+            JSBytesValue::Null => "Null",
+            JSBytesValue::Bool(_) => "Bool",
+            JSBytesValue::Int(_) => "Int",
+            JSBytesValue::Float(_) => "Float",
+            JSBytesValue::String(_) => "String",
+            JSBytesValue::Array(_) => "Array",
+            JSBytesValue::Object(_) => "Object",
+            JSBytesValue::Bytes(_) => "Bytes",
+        })
+        .to_string();
+    }
     pub fn to_value_string<'js>(
         self,
         ctx: &rquickjs::Ctx<'js>,
@@ -110,17 +125,22 @@ impl JSBytesValue {
                     if let JSBytesValue::String(type_field_value) = type_field_value {
                         match type_field_value.as_ref() {
                             "eval" => {
-                                if let Some(JSBytesValue::String(js)) = value.get("value") {
+                                let value =
+                                    value.get("value").ok_or("object not contains a value")?;
+                                if let JSBytesValue::String(js) = value {
                                     return Ok(js.to_owned());
                                 } else {
-                                    return Err(
-                                        "eval typed values needs to be a string".to_string()
-                                    );
+                                    return Err(format!(
+                                        "eval typed values needs to be a string and not {}",
+                                        value.to_type_string()
+                                    ));
                                 }
                             }
                             "json" => {
-                                if let Some(JSBytesValue::Bytes(value)) = value.get("value") {
-                                    let _: serde::de::IgnoredAny = serde_json::from_slice(value)
+                                let value =
+                                    value.get("value").ok_or("object not contains a value")?;
+                                if let JSBytesValue::Bytes(bytes) = value {
+                                    let _: serde::de::IgnoredAny = serde_json::from_slice(bytes)
                                         .map_err(|e| {
                                             format!(
                                                 "failed to convert bytes to json string: {}",
@@ -129,7 +149,7 @@ impl JSBytesValue {
                                         })?;
                                     return Ok(format!(
                                         "{}",
-                                        String::from_utf8(value.clone()).map_err(|e| {
+                                        String::from_utf8(bytes.clone()).map_err(|e| {
                                             format!(
                                                 "failed to convert bytes to json string: {}",
                                                 e.to_string()
@@ -137,7 +157,10 @@ impl JSBytesValue {
                                         })?
                                     ));
                                 } else {
-                                    return Err("json typed values needs to be bytes".to_string());
+                                    return Err(format!(
+                                        "json typed values needs to be bytes and not {}",
+                                        value.to_type_string()
+                                    ));
                                 }
                             }
                             t => return Err(format!("invalid type:{}", t)),
@@ -157,9 +180,9 @@ impl JSBytesValue {
                         .join(", ")
                 ))
             }
-            JSBytesValue::Bytes(value) => Ok(format!(
+            JSBytesValue::Bytes(bytes) => Ok(format!(
                 "new Uint8Array([{}])",
-                value
+                bytes
                     .into_iter()
                     .map(|v| v.to_string())
                     .collect::<Vec<String>>()
@@ -196,7 +219,10 @@ impl JSBytesValue {
                     if let JSBytesValue::String(type_field_value) = type_field_value {
                         match type_field_value.as_ref() {
                             "eval" => {
-                                if let Some(JSBytesValue::String(js)) = value.get("value") {
+                                let value =
+                                    value.get("value").ok_or("object not contains a value")?;
+
+                                if let JSBytesValue::String(js) = value {
                                     let mut options = EvalOptions::default();
                                     options.global = true;
                                     return ctx
@@ -207,20 +233,27 @@ impl JSBytesValue {
                                         .catch(&ctx)
                                         .map_err(|e| format!("eval error: {}", e.to_string()));
                                 } else {
-                                    return Err(
-                                        "eval typed values needs to be a string".to_string()
-                                    );
+                                    return Err(format!(
+                                        "eval typed values needs to be a string and not {}",
+                                        value.to_type_string()
+                                    ));
                                 }
                             }
                             "json" => {
-                                if let Some(JSBytesValue::Bytes(value)) = value.get("value") {
+                                let value =
+                                    value.get("value").ok_or("object not contains a value")?;
+
+                                if let JSBytesValue::Bytes(bytes) = value {
                                     let mut options = EvalOptions::default();
                                     options.global = true;
-                                    return ctx.json_parse(value.clone()).map_err(|e| {
+                                    return ctx.json_parse(bytes.clone()).map_err(|e| {
                                         format!("json parse error: {}", e.to_string())
                                     });
                                 } else {
-                                    return Err("json typed values needs to be bytes".to_string());
+                                    return Err(format!(
+                                        "json typed values needs to be bytes and not {}",
+                                        value.to_type_string()
+                                    ));
                                 }
                             }
                             t => return Err(format!("invalid type:{}", t)),
