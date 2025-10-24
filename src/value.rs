@@ -194,7 +194,7 @@ impl JSBytesValue {
                                 let value =
                                     value.get("value").ok_or("object not contains a value")?;
                                 if let JSBytesValue::String(js) = value {
-                                    return Ok(js.to_owned());
+                                    return Ok(js.clone());
                                 } else {
                                     return Err(format!(
                                         "eval typed values needs to be a string and not {}",
@@ -293,7 +293,7 @@ impl JSBytesValue {
                                     options.global = true;
                                     return ctx
                                         .eval_with_options::<rquickjs::Value, _>(
-                                            js.to_owned(),
+                                            js.clone(),
                                             options,
                                         )
                                         .catch(&ctx)
