@@ -10,19 +10,20 @@ A typst plugin to evaluate javascript code.
 - call functions in modules
 - create quickjs bytecode with an extra tool, to improve loading performance (ctxjs_module_bytecode_builder)
 - allow later evaluation of javascript code
+- allow loading json directly
 - convert images to data urls
 
 ## Example
 
 ```typst
-#import "@preview/ctxjs:0.3.2"
+#import "@preview/ctxjs:0.4.0"
 #import ctxjs.load
 #import ctxjs.ctx
 
 #{
   let dataurl = ctxjs.image-data-url("path_or_bytes.png")
   let newcontext = ctxjs.new-context(
-    (
+    load: (
       load.eval("function test(data) {return data + 2;}"),
     )
   )

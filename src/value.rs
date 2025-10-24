@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use rquickjs::{context::EvalOptions, CatchResultExt};
 use serde::{Deserialize, Serialize};
+use serde_untagged::UntaggedEnumVisitor;
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Clone)]
 pub(crate) enum JSBytesValue {
     Uninitialized,
     Undefined,
@@ -16,6 +16,44 @@ pub(crate) enum JSBytesValue {
     Array(Vec<JSBytesValue>),
     Object(HashMap<String, JSBytesValue>),
     Bytes(Vec<u8>),
+}
+
+impl<'de> Deserialize<'de> for JSBytesValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        UntaggedEnumVisitor::new()
+            .none(|| Ok(JSBytesValue::Null))
+            .bool(|bool| Ok(JSBytesValue::Bool(bool)))
+            .i32(|i| Ok(JSBytesValue::Int(i)))
+            .f64(|f| Ok(JSBytesValue::Float(f)))
+            .string(|str| Ok(JSBytesValue::String(str.to_string())))
+            .map(|map| map.deserialize().map(JSBytesValue::Object))
+            .seq(|seq| seq.deserialize().map(JSBytesValue::Array))
+            .bytes(|bytes| Ok(JSBytesValue::Bytes(bytes.to_vec())))
+            .deserialize(deserializer)
+    }
+}
+
+impl Serialize for JSBytesValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            JSBytesValue::Uninitialized => todo!(),
+            JSBytesValue::Undefined => todo!(),
+            JSBytesValue::Null => todo!(),
+            JSBytesValue::Bool(v) => v.serialize(serializer),
+            JSBytesValue::Int(v) => v.serialize(serializer),
+            JSBytesValue::Float(v) => v.serialize(serializer),
+            JSBytesValue::String(v) => v.serialize(serializer),
+            JSBytesValue::Array(v) => v.serialize(serializer),
+            JSBytesValue::Object(v) => v.serialize(serializer),
+            JSBytesValue::Bytes(v) => serializer.serialize_bytes(v),
+        }
+    }
 }
 
 impl<'js> rquickjs::FromJs<'js> for JSBytesValue {
@@ -40,21 +78,49 @@ impl<'js> rquickjs::FromJs<'js> for JSBytesValue {
                 })?
                 .to_string()
                 .map(JSBytesValue::String),
-            rquickjs::Type::Array => v
-                .as_array()
-                .ok_or_else(|| {
+            rquickjs::Type::Array => {
+                let arr = v.as_array().ok_or_else(|| {
                     rquickjs::Error::new_from_js(v.type_name(), rquickjs::Type::Array.as_str())
-                })?
-                .iter()
-                .map(|v| JSBytesValue::from_js(ctx, v?))
-                .collect::<Result<Vec<JSBytesValue>, rquickjs::Error>>()
-                .map(JSBytesValue::Array),
+                })?;
+
+                if let Some(tarr) = arr.as_typed_array::<u8>() {
+                    return Ok(JSBytesValue::Bytes(
+                        tarr.as_bytes()
+                            .ok_or_else(|| {
+                                rquickjs::Error::new_from_js(
+                                    v.type_name(),
+                                    rquickjs::Type::Object.as_str(),
+                                )
+                            })?
+                            .to_vec(),
+                    ));
+                }
+
+                arr.iter()
+                    .map(|v| JSBytesValue::from_js(ctx, v?))
+                    .collect::<Result<Vec<JSBytesValue>, rquickjs::Error>>()
+                    .map(JSBytesValue::Array)
+            }
             rquickjs::Type::Object => {
                 let mut value = HashMap::<String, JSBytesValue>::new();
 
                 let object = v.as_object().ok_or_else(|| {
                     rquickjs::Error::new_from_js(v.type_name(), rquickjs::Type::Object.as_str())
                 })?;
+
+                if let Some(tarr) = object.as_typed_array::<u8>() {
+                    return Ok(JSBytesValue::Bytes(
+                        tarr.as_bytes()
+                            .ok_or_else(|| {
+                                rquickjs::Error::new_from_js(
+                                    v.type_name(),
+                                    rquickjs::Type::Object.as_str(),
+                                )
+                            })?
+                            .to_vec(),
+                    ));
+                }
+
                 let keys = object
                     .keys::<String>()
                     .map(|key| key)

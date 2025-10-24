@@ -17,9 +17,10 @@ path = "src/bin/ctxjs_module_bytecode_builder/main.rs"
 rquickjs = "0.9.0"
 ciborium = "0.2.2"
 serde = "1.0.228"
-serde_bytes = "0.11.15"
 wasm-minimal-protocol = { git = "https://github.com/astrale-sharp/wasm-minimal-protocol" }
 strfmt = "0.2.4"
 base64 = "0.22.1"
 infer = { version = "0.19.0", default-features = false }
 serde_json = "1.0"
+serde_bytes = "0.11.19"
+serde-untagged = "0.1.9"

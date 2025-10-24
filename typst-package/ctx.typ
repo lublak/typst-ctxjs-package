@@ -27,7 +27,7 @@
 }
 
 #let define-vars(ctxjs, vars, type-field: "$type") = {
-  cbor(ctxjs.define_vars(cbor.encode(vars), helpers.string-to-bytes(type-field)))
+  return plugin.transition(ctxjs.define_vars, cbor.encode(vars), helpers.string-to-bytes(type-field))
 }
 
 #let load-module-bytecode(ctxjs, bytecode) = {

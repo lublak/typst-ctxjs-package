@@ -4,6 +4,9 @@
 #import "ctx.typ" as ctx
 
 #let new-context(load: ()) = {
+  if type(load) != array {
+    load = (load,)
+  }
   return plugin.transition(ctxjs.new_context, cbor.encode(load))
 }
 
