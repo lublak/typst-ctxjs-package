@@ -1,6 +1,6 @@
 [package]
 name = "ctxjs"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 
 [profile.release]
@@ -9,18 +9,17 @@ opt-level = 3
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+half = ["minicbor/half"]
+
 [[bin]]
 name = "ctxjs_module_bytecode_builder"
 path = "src/bin/ctxjs_module_bytecode_builder/main.rs"
 
 [dependencies]
-rquickjs = "0.9.0"
-ciborium = "0.2.2"
-serde = "1.0.228"
+rquickjs = "0.11.0"
 wasm-minimal-protocol = { git = "https://github.com/astrale-sharp/wasm-minimal-protocol" }
 strfmt = "0.2.4"
 base64 = "0.22.1"
 infer = { version = "0.19.0", default-features = false }
-serde_json = "1.0"
-serde_bytes = "0.11.19"
-serde-untagged = "0.1.9"
+minicbor = { version = "2.2.1", features = ["std"] }
