@@ -1,4 +1,4 @@
-use rquickjs::{Context, Module, Runtime};
+use rquickjs::{Context, Module, Runtime, WriteOptions, WriteOptionsEndianness};
 use std::{env, fs};
 
 fn main() {
@@ -18,7 +18,15 @@ fn main() {
     let ctx = Context::full(&rt).unwrap();
     let byte_code = ctx.with(|ctx| {
         let m = Module::declare(ctx, name.as_str(), source).unwrap();
-        let byte_code = m.write(false).unwrap();
+        let byte_code = m
+            .write(WriteOptions {
+                endianness: WriteOptionsEndianness::Native,
+                allow_shared_array_buffer: false,
+                object_reference: false,
+                strip_source: true,
+                strip_debug: true,
+            })
+            .unwrap();
         byte_code
     });
     fs::write(output, byte_code).unwrap();
