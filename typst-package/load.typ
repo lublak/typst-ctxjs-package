@@ -3,29 +3,29 @@
 #let eval-later = helpers.eval-later
 
 #let eval(js) = {
-  return ("method": "Eval", arguments: js)
+  return ("eval", js)
 }
 
 #let eval-format(js, args, type-field: "$type") = {
-  return ("method": "EvalFormat", arguments: (js, args, type-field))
+  return ("eval_format", (js, args, type-field))
 }
 
 #let define-vars(vars, type-field: "$type") = {
-  return ("method": "DefineVars", arguments: (vars, type-field))
+  return ("define_vars", (vars, type-field))
 }
 
 #let call-function(fnname, args, type-field: "$type") = {
-  return ("method": "CallFunction", arguments: (fnname, args, type-field))
+  return ("call_function", (fnname, args, type-field))
 }
 
 #let load-module-bytecode(bytecode) = {
-  return ("method": "LoadModuleBytecode", arguments: bytecode)
+  return ("load_module_bytecode", bytecode)
 }
 
 #let load-module-js(modulename, module) = {
-  return ("method": "LoadModuleJs", arguments: (modulename, module))
+  return ("load_module_js", (modulename, module))
 }
 
 #let call-module-function(modulename, fnname, args, type-field: "$type") = {
-  return ("method": "CallModuleFunction", arguments: (modulename, fnname, args, type-field))
+  return ("call_module_function", (modulename, fnname, args, type-field))
 }
