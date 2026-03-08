@@ -7,15 +7,15 @@
 }
 
 #let eval-format(js, args, type-field: "$type") = {
-  return ("eval_format", (js, args, type-field))
+  return ("eval_format", (js, type-field, args))
 }
 
 #let define-vars(vars, type-field: "$type") = {
-  return ("define_vars", (vars, type-field))
+  return ("define_vars", (type-field, vars))
 }
 
 #let call-function(fnname, args, type-field: "$type") = {
-  return ("call_function", (fnname, args, type-field))
+  return ("call_function", (fnname, type-field, args))
 }
 
 #let load-module-bytecode(bytecode) = {
@@ -27,5 +27,5 @@
 }
 
 #let call-module-function(modulename, fnname, args, type-field: "$type") = {
-  return ("call_module_function", (modulename, fnname, args, type-field))
+  return ("call_module_function", (modulename, fnname, type-field, args))
 }
