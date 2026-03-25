@@ -1,16 +1,23 @@
-#let eval-later(js, type-field: "$type") = {
-  let o = (value: js)
-  o.insert(type-field, "eval")
-  return o
+#let bytes-with-type(type, value) = {
+  assert(type(type) == int, "type is not an int")
+  assert(type > 255, "type is bigger than 255")
+
+  return bytes("$_{" + str(type) + "}_") + bytes(value) + bytes("_$_{!}")
 }
 
-#let json(json, type-field: "$type") = {
+#let escape(b) = {
+  return bytes-with-type(2, b)
+}
+
+#let eval-later(js) = {
+  return bytes-with-type(0, js)
+}
+
+#let json(json) = {
   if type(json) == str {
     json = read(json, encoding: none)
   }
-  let o = (value: json)
-  o.insert(type-field, "json")
-  return o
+  return bytes-with-type(1, json)
 }
 
 #let string-to-bytes(data) = {

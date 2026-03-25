@@ -2,7 +2,7 @@ use minicbor::{
     data::{Int, Type},
     Decoder,
 };
-use rquickjs::{Ctx, Value};
+use rquickjs::{context::EvalOptions, CatchResultExt, CaughtError, Ctx, Value};
 
 pub fn decode_to_rquickjs<'b, 'js>(
     b: &'b [u8],
@@ -11,6 +11,23 @@ pub fn decode_to_rquickjs<'b, 'js>(
 ) -> Result<Value<'js>, minicbor::decode::Error> {
     let mut decoder = Decoder::new(b);
     decode(&mut decoder, ctx, type_field)
+}
+
+fn eval<'js>(
+    ctx: &Ctx<'js>,
+    js: Vec<u8>,
+) -> std::result::Result<rquickjs::Value<'js>, CaughtError<'js>> {
+    let mut options = EvalOptions::default();
+    options.global = true;
+    ctx.eval_with_options::<rquickjs::Value, _>(js, options)
+        .catch(&ctx)
+}
+
+fn json<'js>(
+    ctx: &Ctx<'js>,
+    json: Vec<u8>,
+) -> std::result::Result<rquickjs::Value<'js>, CaughtError<'js>> {
+    ctx.json_parse(json).catch(&ctx)
 }
 
 pub(crate) fn decode<'a, 'js>(
@@ -62,12 +79,28 @@ pub(crate) fn decode<'a, 'js>(
         Type::F32 => Value::new_float(ctx.clone(), decoder.f32()?.into()),
         Type::F64 => Value::new_float(ctx.clone(), decoder.f64()?.into()),
         Type::Simple => Value::new_int(ctx.clone(), decoder.simple()?.into()),
-        bytes if bytes == Type::Bytes || bytes == Type::BytesIndef => rquickjs::TypedArray::new(
-            ctx.clone(),
-            crate::cbor::utils::cbor_bytes!(bytes, decoder)?,
-        )
-        .map_err(|err| minicbor::decode::Error::type_mismatch(bytes).with_message(err))?
-        .into_value(),
+        bytes if bytes == Type::Bytes || bytes == Type::BytesIndef => {
+            match crate::cbor::utils::cbor_bytes!(bytes, decoder)?.as_ref() {
+                [b'$', b'_', b'{', s, b'}', b'_', b @ .., b'_', b'$', b'_', b'{', b'!', b'}'] => {
+                    match s {
+                        0 => eval(ctx, b.to_vec()).map_err(|err| {
+                            minicbor::decode::Error::type_mismatch(bytes).with_message(err)
+                        })?,
+                        1 => json(ctx, b.to_vec()).map_err(|err| {
+                            minicbor::decode::Error::type_mismatch(bytes).with_message(err)
+                        })?,
+                        _ => rquickjs::TypedArray::new(ctx.clone(), b)
+                            .map_err(|err| {
+                                minicbor::decode::Error::type_mismatch(bytes).with_message(err)
+                            })?
+                            .into_value(),
+                    }
+                }
+                b => rquickjs::TypedArray::new(ctx.clone(), b)
+                    .map_err(|err| minicbor::decode::Error::type_mismatch(bytes).with_message(err))?
+                    .into_value(),
+            }
+        }
         string if string == Type::String || string == Type::StringIndef => {
             rquickjs::String::from_str(
                 ctx.clone(),
