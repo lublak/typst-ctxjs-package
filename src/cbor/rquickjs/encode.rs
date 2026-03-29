@@ -5,9 +5,9 @@ use crate::cbor::utils::get_typed_array_type;
 use crate::cbor::utils::TypedArrayType;
 use minicbor::{encode::Write, Encoder};
 
-type Result<T, W: Write> = std::result::Result<T, Error<W>>;
+pub type Result<T, W> = std::result::Result<T, Error<W>>;
 
-enum Error<W: Write> {
+pub enum Error<W: Write> {
     CborEncode(minicbor::encode::Error<W::Error>),
     RquickJSError(rquickjs::Error),
 }
@@ -63,9 +63,9 @@ macro_rules! encode_rquickjs_typed_array {
         let arr = $object
             .as_typed_array::<$t>()
             .ok_or_else(|| rquickjs::Error::new_from_js($object.type_name(), "cbor"))?;
-        $encoder.array(arr.len() as _);
+        $encoder.array(arr.len() as _)?;
         for item in arr.as_ref() as &[$t] {
-            $encoder.$t(*item);
+            $encoder.$t(*item)?;
         }
         Ok($encoder)
     }};
@@ -95,7 +95,7 @@ fn encode_typed_array<'a, 'js, W: Write>(
                             rquickjs::Type::Object.as_str(),
                         )
                     })?,
-            );
+            )?;
             Ok(encoder)
         }
         TypedArrayType::Int8 => encode_rquickjs_typed_array!(encoder, i8, object),

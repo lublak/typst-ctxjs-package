@@ -1,17 +1,8 @@
 use minicbor::{data::Type, Decoder};
 
-pub fn decode_to_string<'b, 'js>(
-    b: &'b [u8],
-    type_field: &str,
-) -> Result<String, minicbor::decode::Error> {
-    let mut decoder = Decoder::new(b);
-    decode(&mut decoder, type_field)
-}
+use crate::cbor::{self, con};
 
-pub(crate) fn decode<'a, 'js>(
-    decoder: &'a mut Decoder,
-    type_field: &str,
-) -> Result<String, minicbor::decode::Error> {
+pub(crate) fn decode<'a, 'js>(decoder: &'a mut Decoder) -> Result<String, minicbor::decode::Error> {
     return Ok(match decoder.datatype()? {
         Type::Bool => if decoder.bool()? { "true" } else { "false" }.to_string(),
         Type::Null => "null".to_string(),
@@ -31,27 +22,63 @@ pub(crate) fn decode<'a, 'js>(
         Type::F64 => decoder.f64()?.to_string(),
         Type::Simple => decoder.simple()?.to_string(),
         bytes if bytes == Type::Bytes || bytes == Type::BytesIndef => {
-            let mut jsstring = String::new();
-            jsstring += "new Uint8Array([";
+            match crate::cbor::utils::bytes!(bytes, decoder)?.as_ref() {
+                [b'$', b'_', b'{', s, b'}', b'_', b @ .., b'_', b'$', b'_', b'{', b'!', b'}'] => {
+                    match s {
+                        &con::EVAL => String::from_utf8(b.to_vec()).map_err(|e| {
+                            minicbor::decode::Error::type_mismatch(bytes).with_message(e)
+                        })?,
+                        &con::JSON => {
+                            if cbor::json::is_json(b) {
+                                String::from_utf8(b.to_vec()).map_err(|e| {
+                                    minicbor::decode::Error::type_mismatch(bytes).with_message(e)
+                                })?
+                            } else {
+                                Err(minicbor::decode::Error::type_mismatch(bytes).with_message(""))?
+                            }
+                        }
+                        _ => {
+                            let mut jsstring = String::new();
+                            jsstring += "new Uint8Array([";
+                            let mut first = true;
 
-            let mut first = true;
+                            for ele in b {
+                                if first {
+                                    first = false
+                                } else {
+                                    jsstring += ","
+                                }
 
-            crate::cbor::utils::loop_cbor_bytes_values!(bytes, decoder, b, {
-                if first {
-                    first = false
-                } else {
-                    jsstring += ","
+                                jsstring += &ele.to_string();
+                            }
+
+                            jsstring + "])"
+                        }
+                    }
                 }
+                b => {
+                    let mut jsstring = String::new();
+                    jsstring += "new Uint8Array([";
+                    let mut first = true;
 
-                jsstring += &b.to_string();
-            })?;
+                    for ele in b {
+                        if first {
+                            first = false
+                        } else {
+                            jsstring += ","
+                        }
 
-            jsstring + "])"
+                        jsstring += &ele.to_string();
+                    }
+
+                    jsstring + "])"
+                }
+            }
         }
         string if string == Type::String || string == Type::StringIndef => {
             format!(
                 "\"{}\"",
-                crate::cbor::utils::cbor_string!(string, decoder)?.replace("\"", "\\\"")
+                crate::cbor::utils::string!(string, decoder)?.replace("\"", "\\\"")
             )
         }
         arr if arr == minicbor::data::Type::Array || arr == minicbor::data::Type::ArrayIndef => {
@@ -60,14 +87,14 @@ pub(crate) fn decode<'a, 'js>(
 
             let mut first = true;
 
-            super::utils::loop_cbor_array!(arr, decoder, {
+            super::utils::loop_array!(arr, decoder, {
                 if first {
                     first = false
                 } else {
                     jsstring += ","
                 }
 
-                jsstring += &decode(decoder, type_field)?;
+                jsstring += &decode(decoder)?;
             })?;
 
             jsstring + "]"
@@ -78,20 +105,12 @@ pub(crate) fn decode<'a, 'js>(
 
             let mut first = true;
 
-            super::utils::loop_cbor_map!(map, decoder, {
+            super::utils::loop_map!(map, decoder, {
                 if first {
                     first = false;
-                    jsstring += &format!(
-                        "{}:{}",
-                        decode(decoder, type_field)?,
-                        decode(decoder, type_field)?,
-                    );
+                    jsstring += &format!("{}:{}", decode(decoder)?, decode(decoder)?,);
                 } else {
-                    jsstring += &format!(
-                        ",{}:{}",
-                        decode(decoder, type_field)?,
-                        decode(decoder, type_field)?,
-                    );
+                    jsstring += &format!(",{}:{}", decode(decoder,)?, decode(decoder,)?,);
                 }
             })?;
 

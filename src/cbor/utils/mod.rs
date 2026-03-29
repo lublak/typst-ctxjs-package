@@ -1,7 +1,7 @@
 pub mod typed_array;
 
 #[macro_export]
-macro_rules! loop_cbor_array {
+macro_rules! loop_array {
     ($t:ident, $decoder:ident, $code:block) => {
         match $t {
             minicbor::data::Type::Array => {
@@ -35,7 +35,55 @@ macro_rules! loop_cbor_array {
 }
 
 #[macro_export]
-macro_rules! loop_cbor_map {
+macro_rules! fixed_size_array {
+    ($t:ident, $decoder:ident, $len:literal, $code:block) => {
+        match $t {
+            minicbor::data::Type::Array => {
+                let len = $decoder.array()?.ok_or_else(|| {
+                    minicbor::decode::Error::type_mismatch(minicbor::data::Type::Array)
+                        .with_message("missing length")
+                })?;
+
+                if len == $len {
+                    $code
+
+                    Ok(())
+                } else {
+                    Err(minicbor::decode::Error::type_mismatch(minicbor::data::Type::Array)
+                        .with_message("mismatch length"))
+                }
+            }
+
+            minicbor::data::Type::ArrayIndef => {
+                if None == $decoder.array()? {
+                    $code
+
+                    if minicbor::data::Type::Break == $decoder.datatype()? {
+
+
+                        $decoder.skip()?;
+
+                        Ok(())
+                    } else {
+                        Err(minicbor::decode::Error::type_mismatch(minicbor::data::Type::Array)
+                        .with_message("mismatch length"))
+                    }
+                } else {
+                    Err(
+                        minicbor::decode::Error::type_mismatch(minicbor::data::Type::ArrayIndef)
+                            .with_message("unexpected length"),
+                    )
+                }
+            }
+            other => Err(minicbor::decode::Error::type_mismatch(other)
+                .with_message("type is not an array")
+                .at($decoder.position())),
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! loop_map {
     ($t:ident, $decoder:ident, $code:block) => {
         match $t {
             minicbor::data::Type::Map => {
@@ -69,7 +117,7 @@ macro_rules! loop_cbor_map {
 }
 
 #[macro_export]
-macro_rules! loop_cbor_bytes_values {
+macro_rules! loop_bytes_values {
     ($t:ident, $decoder:ident, $var:ident, $code:block) => {
         match $t {
             minicbor::data::Type::Bytes => {
@@ -92,7 +140,7 @@ macro_rules! loop_cbor_bytes_values {
 }
 
 #[macro_export]
-macro_rules! cbor_bytes {
+macro_rules! bytes {
     ($t:ident, $decoder:ident) => {
         match $t {
             minicbor::data::Type::Bytes => Ok(std::borrow::Cow::Borrowed($decoder.bytes()?)),
@@ -112,7 +160,7 @@ macro_rules! cbor_bytes {
 }
 
 #[macro_export]
-macro_rules! cbor_string {
+macro_rules! string {
     ($t:ident, $decoder:ident) => {
         match $t {
             minicbor::data::Type::String => Ok(std::borrow::Cow::Borrowed($decoder.str()?)),
@@ -131,9 +179,10 @@ macro_rules! cbor_string {
     };
 }
 
-pub use cbor_bytes;
-pub use cbor_string;
-pub use loop_cbor_array;
-pub use loop_cbor_bytes_values;
-pub use loop_cbor_map;
+pub use bytes;
+pub use fixed_size_array;
+pub use loop_array;
+pub use loop_bytes_values;
+pub use loop_map;
+pub use string;
 pub use typed_array::*;

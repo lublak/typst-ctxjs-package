@@ -4,13 +4,14 @@ use minicbor::{
 };
 use rquickjs::{context::EvalOptions, CatchResultExt, CaughtError, Ctx, Value};
 
+use crate::cbor::con;
+
 pub fn decode_to_rquickjs<'b, 'js>(
     b: &'b [u8],
     ctx: &Ctx<'js>,
-    type_field: &str,
 ) -> Result<Value<'js>, minicbor::decode::Error> {
     let mut decoder = Decoder::new(b);
-    decode(&mut decoder, ctx, type_field)
+    decode(&mut decoder, ctx)
 }
 
 fn eval<'js>(
@@ -33,7 +34,6 @@ fn json<'js>(
 pub(crate) fn decode<'a, 'js>(
     decoder: &'a mut Decoder,
     ctx: &Ctx<'js>,
-    type_field: &str,
 ) -> Result<Value<'js>, minicbor::decode::Error> {
     return Ok(match decoder.datatype()? {
         Type::Bool => rquickjs::Value::new_bool(ctx.clone(), decoder.bool()?),
@@ -80,13 +80,13 @@ pub(crate) fn decode<'a, 'js>(
         Type::F64 => Value::new_float(ctx.clone(), decoder.f64()?.into()),
         Type::Simple => Value::new_int(ctx.clone(), decoder.simple()?.into()),
         bytes if bytes == Type::Bytes || bytes == Type::BytesIndef => {
-            match crate::cbor::utils::cbor_bytes!(bytes, decoder)?.as_ref() {
+            match crate::cbor::utils::bytes!(bytes, decoder)?.as_ref() {
                 [b'$', b'_', b'{', s, b'}', b'_', b @ .., b'_', b'$', b'_', b'{', b'!', b'}'] => {
                     match s {
-                        0 => eval(ctx, b.to_vec()).map_err(|err| {
+                        &con::EVAL => eval(ctx, b.to_vec()).map_err(|err| {
                             minicbor::decode::Error::type_mismatch(bytes).with_message(err)
                         })?,
-                        1 => json(ctx, b.to_vec()).map_err(|err| {
+                        &con::JSON => json(ctx, b.to_vec()).map_err(|err| {
                             minicbor::decode::Error::type_mismatch(bytes).with_message(err)
                         })?,
                         _ => rquickjs::TypedArray::new(ctx.clone(), b)
@@ -102,20 +102,17 @@ pub(crate) fn decode<'a, 'js>(
             }
         }
         string if string == Type::String || string == Type::StringIndef => {
-            rquickjs::String::from_str(
-                ctx.clone(),
-                &crate::cbor::utils::cbor_string!(string, decoder)?,
-            )
-            .map_err(|err| minicbor::decode::Error::type_mismatch(string).with_message(err))?
-            .into_value()
+            rquickjs::String::from_str(ctx.clone(), &crate::cbor::utils::string!(string, decoder)?)
+                .map_err(|err| minicbor::decode::Error::type_mismatch(string).with_message(err))?
+                .into_value()
         }
         arr if arr == minicbor::data::Type::Array || arr == minicbor::data::Type::ArrayIndef => {
             let array = rquickjs::Array::new(ctx.clone())
                 .map_err(|err| minicbor::decode::Error::type_mismatch(arr).with_message(err))?;
             let mut idx = 0;
-            crate::cbor::utils::loop_cbor_array!(arr, decoder, {
+            crate::cbor::utils::loop_array!(arr, decoder, {
                 array
-                    .set(idx, decode(decoder, ctx, type_field)?)
+                    .set(idx, decode(decoder, ctx)?)
                     .map_err(|err| minicbor::decode::Error::type_mismatch(arr).with_message(err))?;
                 idx += 1;
             })?;
@@ -125,12 +122,9 @@ pub(crate) fn decode<'a, 'js>(
         map if map == minicbor::data::Type::Map || map == minicbor::data::Type::MapIndef => {
             let object = rquickjs::Object::new(ctx.clone())
                 .map_err(|err| minicbor::decode::Error::type_mismatch(map).with_message(err))?;
-            crate::cbor::utils::loop_cbor_map!(map, decoder, {
+            crate::cbor::utils::loop_map!(map, decoder, {
                 object
-                    .set(
-                        decode(decoder, ctx, type_field)?,
-                        decode(decoder, ctx, type_field)?,
-                    )
+                    .set(decode(decoder, ctx)?, decode(decoder, ctx)?)
                     .map_err(|err| minicbor::decode::Error::type_mismatch(map).with_message(err))?;
             })?;
 
