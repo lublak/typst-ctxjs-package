@@ -1,31 +1,38 @@
 #import "helpers.typ"
+#import "con.typ"
 
-#let eval-later = helpers.eval-later
+#let cbor-byte-type = 64
 
 #let eval(js) = {
-  return ("eval", js)
+  let value = bytes(js)
+  return bytes((cbor-byte-type, value.len() + 1, con.eval)) + value
 }
 
-#let eval-format(js, args, type-field: "$type") = {
-  return ("eval_format", (js, type-field, args))
+#let eval-format(js, args) = {
+  let value = cbor.encode((js, args))
+  return bytes((cbor-byte-type + value.len() + 1, con.eval-format)) + value
 }
 
-#let define-vars(vars, type-field: "$type") = {
-  return ("define_vars", (type-field, vars))
+#let define-vars(vars) = {
+  let value = cbor.encode((type-field, vars))
+  return bytes((cbor-byte-type + value.len() + 1, con.define-vars)) + value
 }
 
-#let call-function(fnname, args, type-field: "$type") = {
-  return ("call_function", (fnname, type-field, args))
+#let call-function(fnname, args) = {
+  let value = cbor.encode((fnname, args))
+  return bytes((cbor-byte-type + value.len() + 1, con.call-function)) + value
 }
 
 #let load-module-bytecode(bytecode) = {
-  return ("load_module_bytecode", bytecode)
+  return bytes((cbor-byte-type + bytecode.len() + 1, con.load-module-bytecode)) + bytecode
 }
 
 #let load-module-js(modulename, module) = {
-  return ("load_module_js", (modulename, module))
+  let value = cbor.encode((modulename, module))
+  return bytes((cbor-byte-type + value.len() + 1, con.load-module-js)) + value
 }
 
-#let call-module-function(modulename, fnname, args, type-field: "$type") = {
-  return ("call_module_function", (modulename, fnname, type-field, args))
+#let call-module-function(modulename, fnname, args) = {
+  let value = cbor.encode((modulename, fnname, args))
+  return bytes((cbor-byte-type + value.len() + 1, con.call-module-function)) + value
 }
