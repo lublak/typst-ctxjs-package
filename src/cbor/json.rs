@@ -1,6 +1,12 @@
 pub fn is_json(s: &[u8]) -> bool {
     let mut validator = JsonValidator::new(s);
-    validator.validate_value() && validator.is_end_of_input()
+    validator.skip_whitespace();
+    if validator.validate_value() {
+        validator.skip_whitespace();
+        validator.is_end_of_input()
+    } else {
+        false
+    }
 }
 
 struct JsonValidator<'a> {
@@ -14,7 +20,6 @@ impl<'a> JsonValidator<'a> {
     }
 
     fn is_end_of_input(&mut self) -> bool {
-        self.skip_whitespace();
         self.pos >= self.input.len()
     }
 
@@ -45,7 +50,7 @@ impl<'a> JsonValidator<'a> {
             Some(b'[') => self.advance_and_validate_array(),
             Some(b'"') => self.advance_and_validate_string(),
 
-            Some(b'0') => self.validate_fractional(),
+            Some(b'0') => self.advance_and_validate_fractional(),
             Some(b'-' | b'+') => self.advance_and_validate_signed_number(),
             Some((b'1'..=b'9')) => self.advance_and_validate_number(),
 
@@ -169,7 +174,10 @@ impl<'a> JsonValidator<'a> {
 
         loop {
             match self.current() {
-                Some(b'"') => return true, // ""|
+                Some(b'"') => {
+                    self.advance(); // ""|
+                    return true;
+                }
                 Some(b'\\') => {
                     self.advance();
                     match self.current() {
@@ -197,28 +205,33 @@ impl<'a> JsonValidator<'a> {
                     }
                 }
                 Some(b) => {
-                    return match b {
+                    match b {
                         b if (b >> 7) == 0 => {
                             // one byte
                             self.advance();
-                            true
                         }
                         b if (b >> 5) == 0b110 => {
                             // two bytes (110xxxxx 10xxxxxx)
                             self.advance();
-                            self.validate_continuation_bytes(1)
+                            if !self.validate_continuation_bytes(1) {
+                                return false;
+                            }
                         }
                         b if (b >> 4) == 0b1110 => {
                             // three bytes (1110xxxx 10xxxxxx 10xxxxxx)
                             self.advance();
-                            self.validate_continuation_bytes(2)
+                            if !self.validate_continuation_bytes(2) {
+                                return false;
+                            }
                         }
                         b if (b >> 3) == 0b11110 => {
                             // four bytes (11110xxx 10xxxxxx 10xxxxxx, 10xxxxxx)
                             self.advance();
-                            self.validate_continuation_bytes(3)
+                            if !self.validate_continuation_bytes(3) {
+                                return false;
+                            }
                         }
-                        _ => false,
+                        _ => return false,
                     };
                 }
                 _ => return false,
@@ -231,10 +244,15 @@ impl<'a> JsonValidator<'a> {
         self.advance();
         // +|0123.0123
         match self.current() {
-            Some(b'0') => self.validate_fractional(),
+            Some(b'0') => self.advance_and_validate_fractional(),
             Some((b'1'..=b'9')) => self.advance_and_validate_number(),
             _ => false,
         }
+    }
+
+    fn advance_and_validate_fractional(&mut self) -> bool {
+        self.advance();
+        self.validate_fractional()
     }
 
     // 123|.0123
@@ -285,7 +303,9 @@ impl<'a> JsonValidator<'a> {
 
         for expected in literal {
             match self.current() {
-                Some(c) if &c == expected => {}
+                Some(c) if &c == expected => {
+                    self.advance();
+                }
                 _ => return false,
             }
         }
