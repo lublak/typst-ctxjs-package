@@ -1,6 +1,6 @@
 pub fn is_json(s: &[u8]) -> bool {
     let mut validator = JsonValidator::new(s);
-    validator.validate().is_ok() && validator.is_end_of_input()
+    validator.validate_value() && validator.is_end_of_input()
 }
 
 struct JsonValidator<'a> {
@@ -18,182 +18,278 @@ impl<'a> JsonValidator<'a> {
         self.pos >= self.input.len()
     }
 
-    fn peek(&self) -> Option<&u8> {
-        self.input.get(self.pos)
+    fn current(&self) -> Option<u8> {
+        if self.pos < self.input.len() {
+            Some(self.input[self.pos])
+        } else {
+            None
+        }
     }
 
-    fn advance(&mut self) -> Option<&u8> {
-        let ch = self.input.get(self.pos);
-        if ch.is_some() {
-            self.pos += 1;
-        }
-        ch
+    fn advance(&mut self) {
+        self.pos += 1;
     }
 
     fn skip_whitespace(&mut self) {
-        while let Some(&ch) = self.peek() {
+        while let Some(ch) = self.current() {
             match ch {
-                b' ' | b'\t' | b'\n' | b'\r' => {
-                    self.advance();
-                }
+                b' ' | b'\t' | b'\n' | b'\r' => self.advance(),
                 _ => break,
             }
         }
     }
 
-    fn validate(&mut self) -> Result<(), ()> {
-        self.skip_whitespace();
-        match self.peek() {
-            Some(&b'{') => self.parse_object(),
-            Some(&b'[') => self.parse_array(),
-            Some(&b'"') => self.parse_string(),
-            Some(&(b'0'..=b'9') | &b'-' | &b'+' | &b'.' | &b'e' | &b'E') => self.parse_number(),
-            Some(&b't') => self.parse_literal(b"true"),
-            Some(&b'f') => self.parse_literal(b"false"),
-            Some(&b'n') => self.parse_literal(b"null"),
-            _ => Err(()),
+    fn validate_value(&mut self) -> bool {
+        match self.current() {
+            Some(b'{') => self.advance_and_validate_object(),
+            Some(b'[') => self.advance_and_validate_array(),
+            Some(b'"') => self.advance_and_validate_string(),
+
+            Some(b'0') => self.validate_fractional(),
+            Some(b'-' | b'+') => self.advance_and_validate_signed_number(),
+            Some((b'1'..=b'9')) => self.advance_and_validate_number(),
+
+            Some(b't') => self.advance_and_parse_literal(b"rue"),
+            Some(b'f') => self.advance_and_parse_literal(b"alse"),
+            Some(b'n') => self.advance_and_parse_literal(b"ull"),
+            _ => false,
         }
     }
 
-    fn parse_object(&mut self) -> Result<(), ()> {
-        if self.advance() != Some(&b'{') {
-            return Err(());
+    // |{...
+    fn advance_and_validate_object(&mut self) -> bool {
+        self.advance();
+        self.skip_whitespace();
+
+        // {|
+
+        if self.current() == Some(b'}') {
+            self.advance(); // {}|
+            return true;
         }
 
-        self.skip_whitespace();
-        if self.peek() == Some(&b'}') {
+        loop {
+            if self.current() != Some(b'"') {
+                return false;
+            }
+
+            // {"|
+
+            if !self.advance_and_validate_string() {
+                return false;
+            }
+            self.skip_whitespace();
+
+            // {"key"|
+
+            if self.current() != Some(b':') {
+                return false;
+            }
             self.advance();
-            return Ok(());
-        }
-
-        loop {
             self.skip_whitespace();
-            self.parse_string()?;
 
-            self.skip_whitespace();
-            if self.advance() != Some(&b':') {
-                return Err(());
+            // {"key":|
+
+            if !self.validate_value() {
+                return false;
             }
-
-            self.validate()?;
-
             self.skip_whitespace();
-            match self.peek() {
-                Some(&b',') => {
+
+            // {"key":value|
+
+            match self.current() {
+                Some(b',') => {
                     self.advance();
+                    self.skip_whitespace();
+
+                    // {"key":value,|
                 }
-                Some(&b'}') => {
+                Some(b'}') => {
                     self.advance();
-                    return Ok(());
+                    return true; // {"key":value}|
                 }
-                _ => return Err(()),
+                _ => return false,
             }
         }
     }
 
-    fn parse_array(&mut self) -> Result<(), ()> {
-        if self.advance() != Some(&b'[') {
-            return Err(());
-        }
-
+    // |[...
+    fn advance_and_validate_array(&mut self) -> bool {
+        self.advance();
         self.skip_whitespace();
-        if self.peek() == Some(&b']') {
-            self.advance();
-            return Ok(());
+
+        // [|
+
+        if self.current() == Some(b']') {
+            self.advance(); // []|
+            return true;
         }
 
         loop {
-            self.validate()?;
-
+            if !self.validate_value() {
+                return false;
+            }
             self.skip_whitespace();
-            match self.peek() {
-                Some(&b',') => {
+
+            // [value|
+
+            match self.current() {
+                Some(b',') => {
                     self.advance();
+                    self.skip_whitespace();
+
+                    // [value,|
                 }
-                Some(&b']') => {
+                Some(b']') => {
                     self.advance();
-                    return Ok(());
+                    return true; // [value]|
                 }
-                _ => return Err(()),
+                _ => return false,
             }
         }
     }
 
-    fn parse_string(&mut self) -> Result<(), ()> {
-        if self.advance() != Some(&b'"') {
-            return Err(());
+    fn validate_continuation_bytes(&mut self, len: usize) -> bool {
+        for _ in 1..len {
+            match self.current() {
+                Some(c) if (c >> 6) == 0b10 => {
+                    self.advance();
+                }
+                _ => return false,
+            }
         }
+        return true;
+    }
+
+    // |"
+    fn advance_and_validate_string(&mut self) -> bool {
+        self.advance();
+
+        // "|
 
         loop {
-            match self.advance() {
-                Some(&b'"') => return Ok(()),
-                Some(&b'\\') => {
-                    // consume escape + next char
-                    if self.advance().is_none() {
-                        return Err(());
+            match self.current() {
+                Some(b'"') => return true, // ""|
+                Some(b'\\') => {
+                    self.advance();
+                    match self.current() {
+                        Some(b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't') => {
+                            self.advance(); // "\n|
+                        }
+                        Some(b'u') => {
+                            self.advance();
+
+                            // "\u|
+
+                            // 4 hex digits
+                            for _ in 0..4 {
+                                match self.current() {
+                                    Some(b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F') => {
+                                        self.advance();
+                                    }
+                                    _ => return false,
+                                }
+                            }
+
+                            // "\u0000|
+                        }
+                        _ => return false,
                     }
                 }
-                Some(&c) if c < 0x20 => return Err(()),
-                None => return Err(()),
-                _ => {}
+                Some(b) => {
+                    return match b {
+                        b if (b >> 7) == 0 => {
+                            // one byte
+                            self.advance();
+                            true
+                        }
+                        b if (b >> 5) == 0b110 => {
+                            // two bytes (110xxxxx 10xxxxxx)
+                            self.advance();
+                            self.validate_continuation_bytes(1)
+                        }
+                        b if (b >> 4) == 0b1110 => {
+                            // three bytes (1110xxxx 10xxxxxx 10xxxxxx)
+                            self.advance();
+                            self.validate_continuation_bytes(2)
+                        }
+                        b if (b >> 3) == 0b11110 => {
+                            // four bytes (11110xxx 10xxxxxx 10xxxxxx, 10xxxxxx)
+                            self.advance();
+                            self.validate_continuation_bytes(3)
+                        }
+                        _ => false,
+                    };
+                }
+                _ => return false,
             }
         }
     }
 
-    fn parse_number(&mut self) -> Result<(), ()> {
-        // optional sign
-        if matches!(self.peek(), Some(&b'+' | &b'-')) {
-            self.advance();
+    // |+0123.0123
+    fn advance_and_validate_signed_number(&mut self) -> bool {
+        self.advance();
+        // +|0123.0123
+        match self.current() {
+            Some(b'0') => self.validate_fractional(),
+            Some((b'1'..=b'9')) => self.advance_and_validate_number(),
+            _ => false,
         }
+    }
 
-        // integer part
-        match self.peek() {
-            Some(&b'0') => {
-                self.advance();
-            }
-            Some(&(b'1'..=b'9')) => {
-                while matches!(self.peek(), Some(&(b'0'..=b'9'))) {
-                    self.advance();
-                }
-            }
-            _ => return Err(()),
-        }
-
-        // fractional part
-        if self.peek() == Some(&b'.') {
+    // 123|.0123
+    fn validate_fractional(&mut self) -> bool {
+        if self.current() == Some(b'.') {
             self.advance();
-            if !matches!(self.peek(), Some(&(b'0'..=b'9'))) {
-                return Err(());
+            if !matches!(self.current(), Some((b'0'..=b'9'))) {
+                return false;
             }
-            while matches!(self.peek(), Some(&(b'0'..=b'9'))) {
+            while matches!(self.current(), Some((b'0'..=b'9'))) {
                 self.advance();
             }
         }
 
         // exponent part
-        if matches!(self.peek(), Some(&b'e' | &b'E')) {
+        if matches!(self.current(), Some(b'e' | b'E')) {
             self.advance();
-            if matches!(self.peek(), Some(&b'+' | &b'-')) {
+            if matches!(self.current(), Some(b'+' | b'-')) {
                 self.advance();
             }
-            if !matches!(self.peek(), Some(&(b'0'..=b'9'))) {
-                return Err(());
+            if !matches!(self.current(), Some((b'0'..=b'9'))) {
+                return false;
             }
-            while matches!(self.peek(), Some(&(b'0'..=b'9'))) {
+            while matches!(self.current(), Some((b'0'..=b'9'))) {
                 self.advance();
             }
         }
 
-        Ok(())
+        true
     }
 
-    fn parse_literal(&mut self, literal: &[u8]) -> Result<(), ()> {
-        for &expected in literal {
-            if self.advance() != Some(&expected) {
-                return Err(());
+    // |123.0123
+    fn advance_and_validate_number(&mut self) -> bool {
+        self.advance();
+
+        // 1|23.0123
+        while matches!(self.current(), Some((b'0'..=b'9'))) {
+            self.advance();
+        }
+
+        // 123|.0123
+
+        self.validate_fractional()
+    }
+
+    fn advance_and_parse_literal(&mut self, literal: &[u8]) -> bool {
+        self.advance();
+
+        for expected in literal {
+            match self.current() {
+                Some(c) if &c == expected => {}
+                _ => return false,
             }
         }
-        Ok(())
+        true
     }
 }
 
@@ -326,16 +422,20 @@ mod tests {
         assert!(is_json(b"\"\\uabcd\""));
         assert!(is_json(b"\"\\uABcd\""));
 
-        // Invalid: non-hex digits
+        // invalid
         assert!(!is_json(b"\"\\uGGGG\""));
         assert!(!is_json(b"\"\\u000G\""));
+        assert!(!is_json(b"\"a\x00b\"")); // NUL
+        assert!(!is_json(b"\"a\x01b\"")); // SOH
+        assert!(!is_json(b"\"a\x1Fb\"")); // US (unit separator)
     }
 
     #[test]
     fn test_deep_nesting() {
         assert!(is_json(b"[[[[[[[[[[[]]]]]]]]]]]"));
         assert!(is_json(b"{\"a\":{\"b\":{\"c\":{\"d\":{}}}"));
-        // But this is *invalid*:
+
+        // invalid
         assert!(!is_json(b"{\"a\":{\"b\":{\"c\":{\"d\":{}}}")); // missing closing }
     }
 
@@ -363,18 +463,5 @@ mod tests {
         assert!(!is_json(b"1234 ")); // trailing whitespace *is* allowed
         assert!(!is_json(b"1234 5678")); // two numbers = invalid
         assert!(!is_json(b"[]{}")); // multiple top-level values
-    }
-
-    #[test]
-    fn test_control_chars() {
-        assert!(is_json(b"\"a b\"")); // space ✅
-        assert!(is_json(b"\"a\tb\"")); // tab ✅
-        assert!(is_json(b"\"a\nb\"")); // newline ✅
-        assert!(is_json(b"\"a\\rb\"")); // \r ✅
-
-        // But raw control chars in string are invalid
-        assert!(!is_json(b"\"a\x00b\"")); // NUL
-        assert!(!is_json(b"\"a\x01b\"")); // SOH
-        assert!(!is_json(b"\"a\x1Fb\"")); // US (unit separator)
     }
 }
