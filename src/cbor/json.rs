@@ -349,7 +349,7 @@ mod tests {
         assert!(is_json(b"{}"));
         assert!(is_json(b"{\"a\":1}"));
         assert!(is_json(b"{\"a\":1,\"b\":2}"));
-        assert!(is_json(b"{\"x\":{}"));
+        assert!(is_json(b"{\"x\":{}}"));
         assert!(is_json(b"{\"x\":[1,2]}"));
         assert!(is_json(b"{\"a\": {\"b\": {\"c\": 3}}}"));
         assert!(is_json(b"{\"key\":\"value\"}"));
