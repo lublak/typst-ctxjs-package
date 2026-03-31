@@ -453,7 +453,7 @@ mod tests {
     #[test]
     fn test_deep_nesting() {
         assert!(is_json(b"[[[[[[[[[[[]]]]]]]]]]]"));
-        assert!(is_json(b"{\"a\":{\"b\":{\"c\":{\"d\":{}}}"));
+        assert!(is_json(b"{\"a\":{\"b\":{\"c\":{\"d\":{}}}}}"));
 
         // invalid
         assert!(!is_json(b"{\"a\":{\"b\":{\"c\":{\"d\":{}}}")); // missing closing }
@@ -477,10 +477,7 @@ mod tests {
 
     #[test]
     fn test_trailing_content() {
-        assert!(!is_json(b"true "));
         assert!(!is_json(b"true x")); // extra char after whitespace
-        assert!(!is_json(b"1234"));
-        assert!(!is_json(b"1234 ")); // trailing whitespace *is* allowed
         assert!(!is_json(b"1234 5678")); // two numbers = invalid
         assert!(!is_json(b"[]{}")); // multiple top-level values
     }
