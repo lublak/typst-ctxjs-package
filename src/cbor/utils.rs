@@ -1,3 +1,4 @@
+use minicbor::Decoder;
 use rquickjs::qjs;
 
 pub enum TypedArrayType {
@@ -35,4 +36,38 @@ pub fn get_typed_array_type<'js>(v: &rquickjs::Object<'js>) -> Option<TypedArray
         rquickjs::qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_FLOAT64 => Some(TypedArrayType::Float64),
         _ => None,
     }
+}
+
+pub fn array_length(decoder: &mut Decoder) -> Result<u64, minicbor::decode::Error> {
+    decoder.array()?.ok_or_else(|| {
+        minicbor::decode::Error::type_mismatch(minicbor::data::Type::Array)
+            .with_message("missing length")
+    })
+}
+
+pub fn array_fixed_length(decoder: &mut Decoder, len: u64) -> Result<u64, minicbor::decode::Error> {
+    if array_length(decoder)? == len {
+        return Ok(len);
+    }
+    Err(
+        minicbor::decode::Error::type_mismatch(minicbor::data::Type::Array)
+            .with_message("mismatch length"),
+    )
+}
+
+pub fn map_length(decoder: &mut Decoder) -> Result<u64, minicbor::decode::Error> {
+    decoder.map()?.ok_or_else(|| {
+        minicbor::decode::Error::type_mismatch(minicbor::data::Type::Map)
+            .with_message("missing length")
+    })
+}
+
+pub fn map_fixed_length(decoder: &mut Decoder, len: u64) -> Result<u64, minicbor::decode::Error> {
+    if map_length(decoder)? == len {
+        return Ok(len);
+    }
+    Err(
+        minicbor::decode::Error::type_mismatch(minicbor::data::Type::Map)
+            .with_message("mismatch length"),
+    )
 }

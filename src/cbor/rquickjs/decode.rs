@@ -79,55 +79,54 @@ pub(crate) fn decode<'a, 'js>(
         Type::F32 => Value::new_float(ctx.clone(), decoder.f32()?.into()),
         Type::F64 => Value::new_float(ctx.clone(), decoder.f64()?.into()),
         Type::Simple => Value::new_int(ctx.clone(), decoder.simple()?.into()),
-        bytes if bytes == Type::Bytes || bytes == Type::BytesIndef => {
-            match crate::cbor::utils::bytes!(bytes, decoder)?.as_ref() {
-                [b'$', b'_', b'{', s, b'}', b'_', b @ .., b'_', b'$', b'_', b'{', b'!', b'}'] => {
-                    match s {
-                        &con::EVAL => eval(ctx, b.to_vec()).map_err(|err| {
-                            minicbor::decode::Error::type_mismatch(bytes).with_message(err)
-                        })?,
-                        &con::JSON => json(ctx, b.to_vec()).map_err(|err| {
-                            minicbor::decode::Error::type_mismatch(bytes).with_message(err)
-                        })?,
-                        _ => rquickjs::TypedArray::new(ctx.clone(), b)
-                            .map_err(|err| {
-                                minicbor::decode::Error::type_mismatch(bytes).with_message(err)
-                            })?
-                            .into_value(),
-                    }
+        Type::Bytes => match decoder.bytes()? {
+            [b'$', b'_', b'{', s, b'}', b'_', b @ .., b'_', b'$', b'_', b'{', b'!', b'}'] => {
+                match s {
+                    &con::EVAL => eval(ctx, b.to_vec()).map_err(|err| {
+                        minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err)
+                    })?,
+                    &con::JSON => json(ctx, b.to_vec()).map_err(|err| {
+                        minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err)
+                    })?,
+                    _ => rquickjs::TypedArray::new(ctx.clone(), b)
+                        .map_err(|err| {
+                            minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err)
+                        })?
+                        .into_value(),
                 }
-                b => rquickjs::TypedArray::new(ctx.clone(), b)
-                    .map_err(|err| minicbor::decode::Error::type_mismatch(bytes).with_message(err))?
-                    .into_value(),
             }
-        }
-        string if string == Type::String || string == Type::StringIndef => {
-            rquickjs::String::from_str(ctx.clone(), &crate::cbor::utils::string!(string, decoder)?)
-                .map_err(|err| minicbor::decode::Error::type_mismatch(string).with_message(err))?
-                .into_value()
-        }
-        arr if arr == minicbor::data::Type::Array || arr == minicbor::data::Type::ArrayIndef => {
-            let array = rquickjs::Array::new(ctx.clone())
-                .map_err(|err| minicbor::decode::Error::type_mismatch(arr).with_message(err))?;
-            let mut idx = 0;
-            crate::cbor::utils::loop_array!(arr, decoder, {
-                array
-                    .set(idx, decode(decoder, ctx)?)
-                    .map_err(|err| minicbor::decode::Error::type_mismatch(arr).with_message(err))?;
-                idx += 1;
+            b => rquickjs::TypedArray::new(ctx.clone(), b)
+                .map_err(|err| {
+                    minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err)
+                })?
+                .into_value(),
+        },
+        Type::String => rquickjs::String::from_str(ctx.clone(), decoder.str()?)
+            .map_err(|err| minicbor::decode::Error::type_mismatch(Type::String).with_message(err))?
+            .into_value(),
+        Type::Array => {
+            let array = rquickjs::Array::new(ctx.clone()).map_err(|err| {
+                minicbor::decode::Error::type_mismatch(Type::Array).with_message(err)
             })?;
+            for i in 0..crate::cbor::utils::array_length(decoder)? {
+                array.set(i as _, decode(decoder, ctx)?).map_err(|err| {
+                    minicbor::decode::Error::type_mismatch(Type::Array).with_message(err)
+                })?;
+            }
 
             rquickjs::Value::from_array(array)
         }
-        map if map == minicbor::data::Type::Map || map == minicbor::data::Type::MapIndef => {
-            let object = rquickjs::Object::new(ctx.clone())
-                .map_err(|err| minicbor::decode::Error::type_mismatch(map).with_message(err))?;
-            crate::cbor::utils::loop_map!(map, decoder, {
+        Type::Map => {
+            let object = rquickjs::Object::new(ctx.clone()).map_err(|err| {
+                minicbor::decode::Error::type_mismatch(Type::Map).with_message(err)
+            })?;
+            for _ in 0..crate::cbor::utils::map_length(decoder)? {
                 object
                     .set(decode(decoder, ctx)?, decode(decoder, ctx)?)
-                    .map_err(|err| minicbor::decode::Error::type_mismatch(map).with_message(err))?;
-            })?;
-
+                    .map_err(|err| {
+                        minicbor::decode::Error::type_mismatch(Type::Map).with_message(err)
+                    })?;
+            }
             rquickjs::Value::from_object(object)
         }
         other => {

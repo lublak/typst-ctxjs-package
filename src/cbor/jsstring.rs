@@ -21,103 +21,93 @@ pub(crate) fn decode<'a, 'js>(decoder: &'a mut Decoder) -> Result<String, minicb
         Type::F32 => decoder.f32()?.to_string(),
         Type::F64 => decoder.f64()?.to_string(),
         Type::Simple => decoder.simple()?.to_string(),
-        bytes if bytes == Type::Bytes || bytes == Type::BytesIndef => {
-            match crate::cbor::utils::bytes!(bytes, decoder)?.as_ref() {
-                [b'$', b'_', b'{', s, b'}', b'_', b @ .., b'_', b'$', b'_', b'{', b'!', b'}'] => {
-                    match s {
-                        &con::EVAL => String::from_utf8(b.to_vec()).map_err(|e| {
-                            minicbor::decode::Error::type_mismatch(bytes).with_message(e)
-                        })?,
-                        &con::JSON => {
-                            if cbor::json::is_json(b) {
-                                String::from_utf8(b.to_vec()).map_err(|e| {
-                                    minicbor::decode::Error::type_mismatch(bytes).with_message(e)
-                                })?
-                            } else {
-                                Err(minicbor::decode::Error::type_mismatch(bytes).with_message(""))?
-                            }
-                        }
-                        _ => {
-                            let mut jsstring = String::new();
-                            jsstring += "new Uint8Array([";
-                            let mut first = true;
-
-                            for ele in b {
-                                if first {
-                                    first = false
-                                } else {
-                                    jsstring += ","
-                                }
-
-                                jsstring += &ele.to_string();
-                            }
-
-                            jsstring + "])"
-                        }
-                    }
-                }
-                b => {
-                    let mut jsstring = String::new();
-                    jsstring += "new Uint8Array([";
-                    let mut first = true;
-
-                    for ele in b {
-                        if first {
-                            first = false
+        Type::Bytes => match decoder.bytes()? {
+            [b'$', b'_', b'{', s, b'}', b'_', b @ .., b'_', b'$', b'_', b'{', b'!', b'}'] => {
+                match s {
+                    &con::EVAL => String::from_utf8(b.to_vec()).map_err(|e| {
+                        minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(e)
+                    })?,
+                    &con::JSON => {
+                        if cbor::json::is_json(b) {
+                            String::from_utf8(b.to_vec()).map_err(|e| {
+                                minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(e)
+                            })?
                         } else {
-                            jsstring += ","
+                            Err(minicbor::decode::Error::type_mismatch(Type::Bytes)
+                                .with_message(""))?
+                        }
+                    }
+                    _ => {
+                        let mut jsstring = String::new();
+                        jsstring += "new Uint8Array([";
+                        let mut first = true;
+
+                        for ele in b {
+                            if first {
+                                first = false
+                            } else {
+                                jsstring += ","
+                            }
+
+                            jsstring += &ele.to_string();
                         }
 
-                        jsstring += &ele.to_string();
+                        jsstring + "])"
                     }
-
-                    jsstring + "])"
                 }
             }
+            b => {
+                let mut jsstring = String::new();
+                jsstring += "new Uint8Array([";
+                let mut first = true;
+
+                for ele in b {
+                    if first {
+                        first = false
+                    } else {
+                        jsstring += ","
+                    }
+
+                    jsstring += &ele.to_string();
+                }
+
+                jsstring + "])"
+            }
+        },
+        Type::String => {
+            format!("\"{}\"", decoder.str()?.replace("\"", "\\\""))
         }
-        string if string == Type::String || string == Type::StringIndef => {
-            format!(
-                "\"{}\"",
-                crate::cbor::utils::string!(string, decoder)?.replace("\"", "\\\"")
-            )
-        }
-        arr if arr == minicbor::data::Type::Array || arr == minicbor::data::Type::ArrayIndef => {
+        minicbor::data::Type::Array => {
             let mut jsstring = String::new();
             jsstring += "[";
 
-            let mut first = true;
-
-            super::utils::loop_array!(arr, decoder, {
-                if first {
-                    first = false
-                } else {
+            for i in 0..super::utils::array_length(decoder)? {
+                if i != 0 {
                     jsstring += ","
                 }
 
                 jsstring += &decode(decoder)?;
-            })?;
+            }
 
             jsstring + "]"
         }
-        map if map == minicbor::data::Type::Map || map == minicbor::data::Type::MapIndef => {
+        minicbor::data::Type::Map => {
             let mut jsstring = String::new();
             jsstring += "{";
 
-            let mut first = true;
-
-            super::utils::loop_map!(map, decoder, {
-                if first {
-                    first = false;
+            for i in 0..super::utils::map_length(decoder)? {
+                if i == 0 {
                     jsstring += &format!("{}:{}", decode(decoder)?, decode(decoder)?,);
                 } else {
                     jsstring += &format!(",{}:{}", decode(decoder,)?, decode(decoder,)?,);
                 }
-            })?;
+            }
 
             jsstring + "}"
         }
         other => {
-            return Err(minicbor::decode::Error::type_mismatch(other).with_message("unknown type"))
+            return Err(minicbor::decode::Error::type_mismatch(other)
+                .with_message("unknown or unsupported type"))
         }
     });
 }
