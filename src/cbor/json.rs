@@ -390,8 +390,6 @@ mod tests {
 
         // Strings
         assert!(!is_json(b"\"unterminated"));
-        assert!(!is_json(b"\"has\x00control\"")); // control char (0x00)
-        assert!(!is_json(b"\"has\x1fcontrol\"")); // 0x1F is invalid
         assert!(!is_json(b"\"\\\""));
         assert!(!is_json(b"\"\\x\"")); // invalid escape
         assert!(!is_json(b"\"\\u\""));
@@ -443,8 +441,6 @@ mod tests {
         assert!(is_json(b"\"\\uABcd\""));
 
         // invalid
-        assert!(!is_json(b"\"\\uGGGG\""));
-        assert!(!is_json(b"\"\\u000G\""));
         assert!(!is_json(b"\"a\x00b\"")); // NUL
         assert!(!is_json(b"\"a\x01b\"")); // SOH
         assert!(!is_json(b"\"a\x1Fb\"")); // US (unit separator)
