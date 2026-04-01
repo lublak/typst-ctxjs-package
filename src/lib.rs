@@ -202,32 +202,32 @@ fn call_function(fn_name: &[u8], arguments: &[u8], store: &[u8]) -> Result<Vec<u
     })
 }
 
-#[wasm_func]
-fn compile_module_bytecode(module_name: &[u8], module: &[u8]) -> Result<Vec<u8>, String> {
-    let ctx = get_current_context()?;
-
-    let module_name: &str = std::str::from_utf8(module_name)
-        .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
-
-    let module: &str = std::str::from_utf8(module)
-        .map_err(|e| format!("failed to parse module: {}", e.to_string()))?;
-
-    ctx.with(|ctx| {
-        let m = Module::declare(ctx, module_name, module)
-            .map_err(|e| format!("failed declare module: {}", e.to_string()))?;
-        let byte_code = m
-            .write(WriteOptions {
-                endianness: WriteOptionsEndianness::Native,
-                allow_shared_array_buffer: false,
-                object_reference: false,
-                strip_source: true,
-                strip_debug: true,
-            })
-            .map_err(|e| format!("failed to get bytecode: {}", e.to_string()))?;
-
-        Ok(byte_code)
-    })
-}
+//#[wasm_func]
+//fn compile_module_bytecode(module_name: &[u8], module: &[u8]) -> Result<Vec<u8>, String> {
+//    let ctx = get_current_context()?;
+//
+//    let module_name: &str = std::str::from_utf8(module_name)
+//        .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
+//
+//    let module: &str = std::str::from_utf8(module)
+//        .map_err(|e| format!("failed to parse module: {}", e.to_string()))?;
+//
+//    ctx.with(|ctx| {
+//        let m = Module::declare(ctx, module_name, module)
+//            .map_err(|e| format!("failed declare module: {}", e.to_string()))?;
+//        let byte_code = m
+//            .write(WriteOptions {
+//                endianness: WriteOptionsEndianness::Native,
+//                allow_shared_array_buffer: false,
+//                object_reference: false,
+//                strip_source: true,
+//                strip_debug: true,
+//            })
+//            .map_err(|e| format!("failed to get bytecode: {}", e.to_string()))?;
+//
+//        Ok(byte_code)
+//    })
+//}
 
 #[wasm_func]
 fn load_module_bytecode(bytecode: &[u8]) -> Result<Vec<u8>, String> {
