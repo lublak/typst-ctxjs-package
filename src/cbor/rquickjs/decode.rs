@@ -6,13 +6,13 @@ use rquickjs::{context::EvalOptions, CatchResultExt, CaughtError, Ctx, Value};
 
 use crate::cbor::con;
 
-pub fn decode_to_rquickjs<'b, 'js>(
-    b: &'b [u8],
-    ctx: &Ctx<'js>,
-) -> Result<Value<'js>, minicbor::decode::Error> {
-    let mut decoder = Decoder::new(b);
-    decode(&mut decoder, ctx)
-}
+// pub fn decode_to_rquickjs<'b, 'js>(
+//     b: &'b [u8],
+//     ctx: &Ctx<'js>,
+// ) -> Result<Value<'js>, minicbor::decode::Error> {
+//     let mut decoder = Decoder::new(b);
+//     decode(&mut decoder, ctx)
+// }
 
 fn eval<'js>(
     ctx: &Ctx<'js>,

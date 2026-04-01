@@ -62,12 +62,12 @@ pub fn map_length(decoder: &mut Decoder) -> Result<u64, minicbor::decode::Error>
     })
 }
 
-pub fn map_fixed_length(decoder: &mut Decoder, len: u64) -> Result<u64, minicbor::decode::Error> {
-    if map_length(decoder)? == len {
-        return Ok(len);
-    }
-    Err(
-        minicbor::decode::Error::type_mismatch(minicbor::data::Type::Map)
-            .with_message("mismatch length"),
-    )
-}
+// pub fn map_fixed_length(decoder: &mut Decoder, len: u64) -> Result<u64, minicbor::decode::Error> {
+//     if map_length(decoder)? == len {
+//         return Ok(len);
+//     }
+//     Err(
+//         minicbor::decode::Error::type_mismatch(minicbor::data::Type::Map)
+//             .with_message("mismatch length"),
+//     )
+// }
