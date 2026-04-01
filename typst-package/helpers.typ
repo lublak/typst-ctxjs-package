@@ -20,6 +20,20 @@
   return bytes-with-type(1, json)
 }
 
+#let transition-call(ctx, fn, transition, ..args) = {
+  if transition {
+    ctx = plugin.transition(fn, ..args.pos(), bytes((1,)))
+    return (
+      ctx: ctx,
+      value: cbor(ctx.stored_value()),
+    )
+  }
+  return (
+    ctx: ctx,
+    value: cbor(fn(..args.pos(), bytes((0,)))),
+  )
+}
+
 #let string-to-bytes(data) = {
   let data = data
   if type(data) == str {

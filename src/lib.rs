@@ -2,10 +2,7 @@ use std::collections::HashMap;
 
 use base64::Engine as _;
 use minicbor::{Decoder, Encoder};
-use rquickjs::{
-    context::EvalOptions, function::Args, CatchResultExt, Context, Module, Runtime, WriteOptions,
-    WriteOptionsEndianness,
-};
+use rquickjs::{context::EvalOptions, function::Args, CatchResultExt, Context, Module, Runtime};
 use wasm_minimal_protocol::*;
 
 use strfmt::strfmt;
