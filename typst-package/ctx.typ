@@ -1,16 +1,8 @@
-#import "helpers.typ"
-
-#let cbor-array-type = 128
-
-#let eval-later = helpers.eval-later
-
-#let json = helpers.json
-
-#let image-data-url = helpers.image-data-url
+#import "internal.typ" as _internal
 
 #let load(ctx, ..load) = {
   let args = load.pos()
-  let data = bytes((cbor-array-type + args.len(),))
+  let data = bytes((_internal.cbor-array-type + args.len(),))
   for value in args {
     data = data + value
   }
@@ -21,26 +13,26 @@
 }
 
 #let eval(ctx, js, transition: false) = {
-  helpers.transition-call(
+  _internal.transition-call(
     ctx,
     ctx.eval,
     transition,
-    helpers.string-to-bytes(js),
+    _internal.string-to-bytes(js),
   )
 }
 
 #let eval-format(ctx, js, args, transition: false) = {
-  helpers.transition-call(
+  _internal.transition-call(
     ctx,
     ctx.eval_format,
     transition,
-    helpers.string-to-bytes(js),
+    _internal.string-to-bytes(js),
     cbor.encode(args),
   )
 }
 
 #let define-vars(ctx, vars, transition: false) = {
-  helpers.transition-call(
+  _internal.transition-call(
     ctx,
     ctx.define_vars,
     transition,
@@ -49,13 +41,13 @@
 }
 
 #let call-function(ctx, fnname, args, transition: false) = {
-  helpers.transition-call(
+  _internal.transition-call(
     ctx,
     ctx.call_function,
     transition,
-    helpers.string-to-bytes(fnname),
+    _internal.string-to-bytes(fnname),
     cbor.encode(args),
-    helpers.string-to-bytes(type-field),
+    _internal.string-to-bytes(type-field),
   )
 }
 
@@ -68,18 +60,22 @@
 
 #let load-module-js(ctx, modulename, module) = {
   (
-    ctx: plugin.transition(ctx.load_module_js, helpers.string-to-bytes(modulename), helpers.string-to-bytes(module)),
+    ctx: plugin.transition(
+      ctx.load_module_js,
+      _internal.string-to-bytes(modulename),
+      _internal.string-to-bytes(module),
+    ),
     value: none,
   )
 }
 
 #let call-module-function(ctx, modulename, fnname, args, transition: false) = {
-  helpers.transition-call(
+  _internal.transition-call(
     ctx,
     ctx.call_module_function,
     transition,
-    helpers.string-to-bytes(modulename),
-    helpers.string-to-bytes(fnname),
+    _internal.string-to-bytes(modulename),
+    _internal.string-to-bytes(fnname),
     cbor.encode(args),
   )
 }
@@ -87,6 +83,6 @@
 #let get-module-properties(ctx, modulename) = {
   (
     ctx: ctx,
-    value: cbor(ctx.get_module_properties(helpers.string-to-bytes(modulename))),
+    value: cbor(ctx.get_module_properties(_internal.string-to-bytes(modulename))),
   )
 }

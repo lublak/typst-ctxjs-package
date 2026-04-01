@@ -1,10 +1,9 @@
-#let ctxjs = plugin("ctxjs.wasm")
+#import "internal.typ" as _internal
 
 #import "load.typ" as load
 #import "ctx.typ" as ctx
+#import "value.typ" as value
 
 #let new-context(..load) = {
-  return plugin.transition(ctxjs.new_context, cbor.encode(load.pos()))
+  return plugin.transition(_internal.wasm.new_context, cbor.encode(load.pos()))
 }
-
-#let image-data-url = ctx.image-data-url
