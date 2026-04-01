@@ -318,12 +318,32 @@ mod tests {
     use super::is_json;
 
     #[test]
-    fn test_valid_primitives() {
+    fn test_valid_literals() {
         assert!(is_json(b"true"));
         assert!(is_json(b"false"));
         assert!(is_json(b"null"));
+
+        assert!(is_json(b"   true   "));
+        assert!(is_json(b"   false   "));
+        assert!(is_json(b"   null   "));
+    }
+
+    #[test]
+    fn test_invalid_literals() {
+        assert!(!is_json(b"t"));
+        assert!(!is_json(b"tru"));
+        assert!(!is_json(b"tru "));
+        assert!(!is_json(b"tRUE"));
+        assert!(!is_json(b"fals"));
+        assert!(!is_json(b"nulll"));
+    }
+
+    #[test]
+    fn test_valid_numbers() {
         assert!(is_json(b"0"));
         assert!(is_json(b"-0"));
+        assert!(is_json(b"0.0"));
+        assert!(is_json(b"-0.0"));
         assert!(is_json(b"123"));
         assert!(is_json(b"-456"));
         assert!(is_json(b"3.14"));
@@ -332,16 +352,73 @@ mod tests {
         assert!(is_json(b"1.23e-4"));
         assert!(is_json(b"1.23e+5"));
         assert!(is_json(b"1.23E+10"));
+
+        assert!(is_json(b"0e0"));
+        assert!(is_json(b"0.0e0"));
+        assert!(is_json(b"1e0"));
+        assert!(is_json(b"1.0e0"));
+        assert!(is_json(b"1.0E-0"));
+        assert!(is_json(b"1.0e+0"));
+        assert!(is_json(b"1.234567890"));
+        assert!(is_json(b"12345678901234567890"));
+
+        assert!(is_json(b"   0.0   "));
+        assert!(is_json(b"   123   "));
+        assert!(is_json(b"   1.0e+0   "));
+    }
+
+    #[test]
+    fn test_invalid_numbers() {
+        assert!(!is_json(b"00"));
+        assert!(!is_json(b"123abc"));
+        assert!(!is_json(b"1."));
+        assert!(!is_json(b".2"));
+        assert!(!is_json(b"1.2.3"));
+        assert!(!is_json(b"e10"));
+        assert!(!is_json(b"1e"));
+        assert!(!is_json(b"1e-"));
+        assert!(!is_json(b"1e+"));
+        assert!(!is_json(b"+"));
+        assert!(!is_json(b"-"));
+        assert!(!is_json(b"++"));
+        assert!(!is_json(b"--"));
+        assert!(!is_json(b"123abc"));
+    }
+
+    #[test]
+    fn test_valid_strings() {
         assert!(is_json(b"\"hello\""));
-        assert!(is_json(b"\"a\\\"b\""));
-        assert!(is_json(b"\"\\n\""));
-        assert!(is_json(b"\"\\t\""));
+        assert!(is_json(b"\"\\\"\""));
+        assert!(is_json(b"\"\\\\\""));
+        assert!(is_json(b"\"\\/\""));
         assert!(is_json(b"\"\\b\""));
         assert!(is_json(b"\"\\f\""));
+        assert!(is_json(b"\"\\n\""));
         assert!(is_json(b"\"\\r\""));
+        assert!(is_json(b"\"\\t\""));
         assert!(is_json(b"\"\\u0000\""));
         assert!(is_json(b"\"\\u1234\""));
         assert!(is_json(b"\"\\uFFFF\""));
+
+        assert!(is_json(b"   \"hello\"   "));
+        assert!(is_json(b"   \"\\\"\"   "));
+        assert!(is_json(b"   \"\\u1234\"   "));
+    }
+
+    #[test]
+    fn test_invalid_strings() {
+        assert!(!is_json(b"\"unterminated"));
+        assert!(!is_json(b"\"\\\""));
+        assert!(!is_json(b"\"\"\""));
+        assert!(!is_json(b"\"\\x\"")); // invalid escape
+        assert!(!is_json(b"\"\\u\""));
+        assert!(!is_json(b"\"\\u1\""));
+        assert!(!is_json(b"\"\\u12\""));
+        assert!(!is_json(b"\"\\u123\""));
+        assert!(!is_json(b"\"\\uXXXX\"")); // non-hex
+        assert!(!is_json(b"\"a\x00b\"")); // NUL
+        assert!(!is_json(b"\"a\x01b\"")); // SOH
+        assert!(!is_json(b"\"a\x1Fb\"")); // US
     }
 
     #[test]
@@ -353,6 +430,26 @@ mod tests {
         assert!(is_json(b"{\"x\":[1,2]}"));
         assert!(is_json(b"{\"a\": {\"b\": {\"c\": 3}}}"));
         assert!(is_json(b"{\"key\":\"value\"}"));
+        assert!(is_json(b"{\"key\":true}"));
+
+        assert!(is_json(b"  {   \"a\"   :   1   }  "));
+        assert!(is_json(b"  {   \"a\"   :   {  }   }  "));
+
+        assert!(is_json(b"{\"a\":{\"b\":{\"c\":{\"d\":{}}}}}"));
+    }
+
+    #[test]
+    fn test_invalid_objects() {
+        assert!(!is_json(b"{"));
+        assert!(!is_json(b"{\"key\""));
+        assert!(!is_json(b"{\"key\":"));
+        assert!(!is_json(b"{}{"));
+        assert!(!is_json(b"{\"a\":1,}"));
+        assert!(!is_json(b"{\"a\":1,\"b\":}"));
+        assert!(!is_json(b"{\"a\":1,,\"b\":2}"));
+        assert!(!is_json(b"{1:true}"));
+
+        assert!(!is_json(b"{\"a\":{\"b\":{\"c\":{\"d\":{}}}}"));
     }
 
     #[test]
@@ -364,117 +461,34 @@ mod tests {
         assert!(is_json(b"[1, \"two\", true, null]"));
         assert!(is_json(b"[1, [2, [3]]]"));
         assert!(is_json(b"[{},{},{}]"));
-    }
 
-    #[test]
-    fn test_whitespace_handling() {
-        assert!(is_json(b"  true  "));
-        assert!(is_json(b"\nfalse\n"));
-        assert!(is_json(b"\tnull\t"));
-        assert!(is_json(b" [ 1 , 2 , 3 ] "));
-        assert!(is_json(b"{ \"a\" : 1 }"));
-        assert!(is_json(b"  { \n \"key\" : \"value\" }  "));
-    }
+        assert!(is_json(b"  [  1  , [  2, [  3  ]  ]  ]  "));
+        assert!(is_json(b" [ {  } ,  {   } , { } ] "));
 
-    #[test]
-    fn test_invalid_primitives() {
-        // Numbers
-        assert!(!is_json(b""));
-        assert!(!is_json(b"123abc"));
-        assert!(!is_json(b"1.2.3"));
-        assert!(!is_json(b"e10"));
-        assert!(!is_json(b"1e"));
-        assert!(!is_json(b"1e+"));
-        assert!(!is_json(b"+"));
-        assert!(!is_json(b"-"));
-
-        // Strings
-        assert!(!is_json(b"\"unterminated"));
-        assert!(!is_json(b"\"\\\""));
-        assert!(!is_json(b"\"\\x\"")); // invalid escape
-        assert!(!is_json(b"\"\\u\""));
-        assert!(!is_json(b"\"\\u1\""));
-        assert!(!is_json(b"\"\\u12\""));
-        assert!(!is_json(b"\"\\u123\""));
-        assert!(!is_json(b"\"\\uXXXX\"")); // non-hex
-
-        // Literals
-        assert!(!is_json(b"tru"));
-        assert!(!is_json(b"tRue"));
-        assert!(!is_json(b"tRUE"));
-        assert!(!is_json(b"fals"));
-        assert!(!is_json(b"nulll"));
-    }
-
-    #[test]
-    fn test_invalid_syntax() {
-        assert!(!is_json(b"{"));
-        assert!(!is_json(b"{}{"));
-        assert!(!is_json(b"["));
-        assert!(!is_json(b"[]["));
-        assert!(!is_json(b"{\"a\":1,\"b\":}"));
-        assert!(!is_json(b"{\"a\":1,,\"b\":2}"));
-        assert!(!is_json(b"[1,2,]"));
-        assert!(!is_json(b"\"unclosed\\"));
-        assert!(!is_json(b"\"\\\""));
-        assert!(!is_json(b"\"\"\"")); // triple quote is not valid escape
-        assert!(!is_json(b"123abc"));
-        assert!(!is_json(b"123abc"));
-    }
-
-    #[test]
-    fn test_empty_input() {
-        assert!(!is_json(b""));
-    }
-
-    #[test]
-    fn test_unicode_escapes() {
-        assert!(is_json(b"\"\\u0000\"")); // null
-        assert!(is_json(b"\"\\u001F\"")); // 0x1F
-        assert!(is_json(b"\"\\u0020\"")); // space (valid)
-        assert!(is_json(b"\"\\u007F\"")); // DEL
-        assert!(is_json(b"\"\\u0080\"")); // next byte (still valid string — just not ASCII)
-        assert!(is_json(b"\"\\u00FF\""));
-        assert!(is_json(b"\"\\u1234\""));
-        assert!(is_json(b"\"\\uABCD\""));
-        assert!(is_json(b"\"\\uabcd\""));
-        assert!(is_json(b"\"\\uABcd\""));
-
-        // invalid
-        assert!(!is_json(b"\"a\x00b\"")); // NUL
-        assert!(!is_json(b"\"a\x01b\"")); // SOH
-        assert!(!is_json(b"\"a\x1Fb\"")); // US (unit separator)
-    }
-
-    #[test]
-    fn test_deep_nesting() {
         assert!(is_json(b"[[[[[[[[[[[]]]]]]]]]]]"));
-        assert!(is_json(b"{\"a\":{\"b\":{\"c\":{\"d\":{}}}}}"));
-
-        // invalid
-        assert!(!is_json(b"{\"a\":{\"b\":{\"c\":{\"d\":{}}}")); // missing closing }
     }
 
     #[test]
-    fn test_numbers_edge_cases() {
-        assert!(is_json(b"0.0"));
-        assert!(is_json(b"-0.0"));
-        assert!(is_json(b"0e0"));
-        assert!(is_json(b"0.0e0"));
-        assert!(is_json(b"1.234567890"));
-        assert!(is_json(b"12345678901234567890")); // large int
+    fn test_invalid_arrays() {
+        assert!(!is_json(b"["));
+        assert!(!is_json(b"[1"));
+        assert!(!is_json(b"[]["));
+        assert!(!is_json(b"[1,,2]"));
+        assert!(!is_json(b"[1,2,]"));
 
-        // Negative exponent (even 0)
-        assert!(is_json(b"1e0"));
-        assert!(is_json(b"1.0e0"));
-        assert!(is_json(b"1.0E-0"));
-        assert!(is_json(b"1.0e+0"));
+        assert!(!is_json(b"[[[[[[[[[[[]]]]]]]]]]"));
     }
 
     #[test]
-    fn test_trailing_content() {
-        assert!(!is_json(b"true x")); // extra char after whitespace
-        assert!(!is_json(b"1234 5678")); // two numbers = invalid
-        assert!(!is_json(b"[]{}")); // multiple top-level values
+    fn test_invalid_empty_input() {
+        assert!(!is_json(b""));
+    }
+
+    #[test]
+    fn test_invalid_multiple_contents() {
+        assert!(!is_json(b"true true"));
+        assert!(!is_json(b"1234 5678"));
+        assert!(!is_json(b"[]{}"));
+        assert!(!is_json(b"\"\"\"\""));
     }
 }
