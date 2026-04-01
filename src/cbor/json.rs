@@ -208,6 +208,9 @@ impl<'a> JsonValidator<'a> {
                     match b {
                         b if (b >> 7) == 0 => {
                             // one byte
+                            if b < 0x20 {
+                                return false;
+                            }
                             self.advance();
                         }
                         b if (b >> 5) == 0b110 => {
