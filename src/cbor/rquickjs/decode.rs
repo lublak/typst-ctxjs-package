@@ -2,9 +2,9 @@ use minicbor::{
     data::{Int, Type},
     Decoder,
 };
-use rquickjs::{context::EvalOptions, CatchResultExt, CaughtError, Ctx, Value};
+use rquickjs::{context::EvalOptions, CatchResultExt, Ctx, Value};
 
-use crate::cbor::con;
+use crate::{cbor::con, strfmt};
 
 // pub fn decode_to_rquickjs<'b, 'js>(
 //     b: &'b [u8],
@@ -14,21 +14,44 @@ use crate::cbor::con;
 //     decode(&mut decoder, ctx)
 // }
 
-fn eval<'js>(
+fn eval<'a, 'js>(
+    decoder: &'a mut Decoder,
     ctx: &Ctx<'js>,
-    js: Vec<u8>,
-) -> std::result::Result<rquickjs::Value<'js>, CaughtError<'js>> {
+) -> Result<Value<'js>, minicbor::decode::Error> {
     let mut options = EvalOptions::default();
     options.global = true;
-    ctx.eval_with_options::<rquickjs::Value, _>(js, options)
+    ctx.eval_with_options::<rquickjs::Value, _>(decoder.str()?, options)
         .catch(&ctx)
+        .map_err(|err| minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err))
 }
 
-fn json<'js>(
+fn eval_format<'a, 'js>(
+    decoder: &'a mut Decoder,
     ctx: &Ctx<'js>,
-    json: Vec<u8>,
-) -> std::result::Result<rquickjs::Value<'js>, CaughtError<'js>> {
-    ctx.json_parse(json).catch(&ctx)
+) -> Result<Value<'js>, minicbor::decode::Error> {
+    crate::cbor::utils::array_fixed_length(decoder, 2)?;
+
+    let js = decoder.bytes()?;
+    let arguments = super::args::string_map(decoder)?;
+
+    let mut options = EvalOptions::default();
+    options.global = true;
+    ctx.eval_with_options::<rquickjs::Value, _>(
+        strfmt::strfmt(js, &arguments)
+            .map_err(|err| minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err))?,
+        options,
+    )
+    .catch(&ctx)
+    .map_err(|err| minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err))
+}
+
+fn json<'a, 'js>(
+    decoder: &'a mut Decoder,
+    ctx: &Ctx<'js>,
+) -> Result<Value<'js>, minicbor::decode::Error> {
+    ctx.json_parse(decoder.str()?)
+        .catch(&ctx)
+        .map_err(|err| minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err))
 }
 
 pub(crate) fn decode<'a, 'js>(
@@ -79,28 +102,9 @@ pub(crate) fn decode<'a, 'js>(
         Type::F32 => Value::new_float(ctx.clone(), decoder.f32()?.into()),
         Type::F64 => Value::new_float(ctx.clone(), decoder.f64()?.into()),
         Type::Simple => Value::new_int(ctx.clone(), decoder.simple()?.into()),
-        Type::Bytes => match decoder.bytes()? {
-            [b'$', b'_', b'{', s, b'}', b'_', b @ .., b'_', b'$', b'_', b'{', b'!', b'}'] => {
-                match s {
-                    &con::EVAL => eval(ctx, b.to_vec()).map_err(|err| {
-                        minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err)
-                    })?,
-                    &con::JSON => json(ctx, b.to_vec()).map_err(|err| {
-                        minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err)
-                    })?,
-                    _ => rquickjs::TypedArray::new(ctx.clone(), b)
-                        .map_err(|err| {
-                            minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err)
-                        })?
-                        .into_value(),
-                }
-            }
-            b => rquickjs::TypedArray::new(ctx.clone(), b)
-                .map_err(|err| {
-                    minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err)
-                })?
-                .into_value(),
-        },
+        Type::Bytes => rquickjs::TypedArray::new(ctx.clone(), decoder.bytes()?)
+            .map_err(|err| minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err))?
+            .into_value(),
         Type::String => rquickjs::String::from_str(ctx.clone(), decoder.str()?)
             .map_err(|err| minicbor::decode::Error::type_mismatch(Type::String).with_message(err))?
             .into_value(),
@@ -129,6 +133,16 @@ pub(crate) fn decode<'a, 'js>(
             }
             rquickjs::Value::from_object(object)
         }
+        Type::Tag => match decoder.tag()? {
+            con::ESCAPE => decode(decoder, ctx)?,
+            con::EVAL => eval(decoder, ctx)?,
+            con::EVAL_FORMAT => eval_format(decoder, ctx)?,
+            con::JSON => json(decoder, ctx)?,
+            t => {
+                return Err(minicbor::decode::Error::tag_mismatch(t)
+                    .with_message(format!("unsupported tagged data {}", t)))
+            }
+        },
         other => {
             return Err(minicbor::decode::Error::type_mismatch(other).with_message("unknown type"))
         }

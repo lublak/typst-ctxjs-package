@@ -1,17 +1,13 @@
-use std::collections::HashMap;
-
 use base64::Engine as _;
 use minicbor::{Decoder, Encoder};
 use rquickjs::{context::EvalOptions, function::Args, CatchResultExt, Context, Module, Runtime};
 use wasm_minimal_protocol::*;
 
-use strfmt::strfmt;
-
 use crate::cbor_load::cbor_decode_run_load;
 
-mod args;
 mod cbor;
 mod cbor_load;
+mod strfmt;
 
 initiate_protocol!();
 
@@ -120,10 +116,9 @@ fn eval(js: &[u8], store: &[u8]) -> Result<Vec<u8>, String> {
 fn eval_format(js: &[u8], arguments: &[u8], store: &[u8]) -> Result<Vec<u8>, String> {
     let ctx = get_current_context()?;
 
-    let js =
-        std::str::from_utf8(js).map_err(|e| format!("failed to parse js: {}", e.to_string()))?;
+    let mut decoder = Decoder::new(arguments);
 
-    let arguments: HashMap<String, String> = args::string_map(&mut Decoder::new(arguments))
+    let arguments = cbor::rquickjs::args::string_map(&mut decoder)
         .map_err(|e| format!("failed to deserialize arguments: {}", e.to_string()))?;
 
     let store = !store.is_empty() && store[0] > 0;
@@ -134,7 +129,8 @@ fn eval_format(js: &[u8], arguments: &[u8], store: &[u8]) -> Result<Vec<u8>, Str
     ctx.with(|ctx| {
         let value = ctx
             .eval_with_options(
-                strfmt(js, &arguments).map_err(|e| format!("can not format js string: {}", e))?,
+                strfmt::strfmt(js, &arguments)
+                    .map_err(|e| format!("can not format js string: {}", e))?,
                 options,
             )
             .catch(&ctx)
@@ -144,10 +140,12 @@ fn eval_format(js: &[u8], arguments: &[u8], store: &[u8]) -> Result<Vec<u8>, Str
 }
 
 #[wasm_func]
-fn define_vars(variables: &[u8], store: &[u8]) -> Result<Vec<u8>, String> {
+fn define_vars(variables: &[u8]) -> Result<Vec<u8>, String> {
     let ctx = get_current_context()?;
 
-    let variables: HashMap<String, String> = args::string_map(&mut Decoder::new(variables))
+    let mut decoder = Decoder::new(variables);
+
+    let variables = cbor::rquickjs::args::string_map(&mut decoder)
         .map_err(|e| format!("failed to deserialize variables: {}", e.to_string()))?;
 
     let variables: String = variables
@@ -155,15 +153,13 @@ fn define_vars(variables: &[u8], store: &[u8]) -> Result<Vec<u8>, String> {
         .map(|(k, v)| format!("let {}={}", k, v))
         .fold(String::new(), |a, b| a + &b + ";");
 
-    let store = !store.is_empty() && store[0] > 0;
-
     ctx.with(|ctx| {
-        let value = ctx
+        _ = ctx
             .eval::<rquickjs::Value, std::string::String>(format!("{};", variables))
             .catch(&ctx)
             .map_err(|e| format!("eval error: {}", e.to_string()))?;
 
-        set_stored_value_from_rquickjs(store, &value)
+        Ok(vec![])
     })
 }
 
@@ -177,8 +173,9 @@ fn call_function(fn_name: &[u8], arguments: &[u8], store: &[u8]) -> Result<Vec<u
     let store = store.len() > 0 && store[0] > 0;
 
     ctx.with(|ctx| {
-        let arguments: Vec<rquickjs::Value> = args::array(&ctx, &mut Decoder::new(arguments))
-            .map_err(|e| format!("failed to deserialize arguments: {}", e.to_string()))?;
+        let arguments: Vec<rquickjs::Value> =
+            cbor::rquickjs::args::array(&ctx, &mut Decoder::new(arguments))
+                .map_err(|e| format!("failed to deserialize arguments: {}", e.to_string()))?;
 
         let mut args = Args::new(ctx.clone(), arguments.len());
         args.push_args(arguments)
@@ -283,8 +280,9 @@ fn call_module_function(
     let store = store.len() > 0 && store[0] > 0;
 
     ctx.with(|ctx| {
-        let arguments: Vec<rquickjs::Value> = args::array(&ctx, &mut Decoder::new(arguments))
-            .map_err(|e| format!("failed to deserialize arguments: {}", e.to_string()))?;
+        let arguments: Vec<rquickjs::Value> =
+            cbor::rquickjs::args::array(&ctx, &mut Decoder::new(arguments))
+                .map_err(|e| format!("failed to deserialize arguments: {}", e.to_string()))?;
 
         let mut args = Args::new(ctx.clone(), arguments.len());
         args.push_args(arguments)

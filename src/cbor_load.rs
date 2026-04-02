@@ -2,12 +2,17 @@ use minicbor::Decoder;
 use rquickjs::{
     context::EvalOptions, function::Args, CatchResultExt, CaughtError, Context, Module,
 };
-use strfmt::strfmt;
 
-use crate::{
-    args,
-    cbor::{self, con},
-};
+use crate::cbor;
+use crate::strfmt;
+
+const LOAD_EVAL: u8 = 0;
+const LOAD_EVAL_FORMAT: u8 = 1;
+const LOAD_DEFINE_VARS: u8 = 2;
+const LOAD_CALL_FUNCTION: u8 = 3;
+const LOAD_LOAD_MODULE_BYTECODE: u8 = 4;
+const LOAD_LOAD_MODULE_JS: u8 = 5;
+const LOAD_CALL_MODULE_FUNCTION: u8 = 6;
 
 fn run_load_eval(js: &[u8], ctx: &Context) -> Result<(), minicbor::decode::Error> {
     let js: &str = std::str::from_utf8(js).map_err(|err| minicbor::decode::Error::custom(err))?;
@@ -32,15 +37,15 @@ fn cbor_decode_run_load_eval_format(
 ) -> Result<(), minicbor::decode::Error> {
     cbor::utils::array_fixed_length(decoder, 2)?;
 
-    let js = decoder.str()?;
-    let arguments = args::string_map(decoder)?;
+    let js = decoder.bytes()?;
+    let arguments = cbor::rquickjs::args::string_map(decoder)?;
 
     let mut options = EvalOptions::default();
     options.global = true;
 
     _ = ctx.with(|ctx| -> Result<(), minicbor::decode::Error> {
         ctx.eval_with_options(
-            strfmt(&js, &arguments).map_err(|err| {
+            strfmt::strfmt(&js, &arguments).map_err(|err| {
                 minicbor::decode::Error::message(format!("can not format js string: {}", err))
             })?,
             options,
@@ -55,7 +60,7 @@ fn cbor_decode_run_load_define_vars(
     decoder: &mut Decoder,
     ctx: &Context,
 ) -> Result<(), minicbor::decode::Error> {
-    let variables = args::string_map(decoder)?
+    let variables = cbor::rquickjs::args::string_map(decoder)?
         .into_iter()
         .map(|(k, v)| format!("let {}={}", k, v))
         .fold(String::new(), |a, b| a + &b + ";");
@@ -79,12 +84,13 @@ fn cbor_decode_run_call_function(
     let fn_name = decoder.str()?;
 
     _ = ctx.with(|ctx| -> Result<(), minicbor::decode::Error> {
-        let arguments: Vec<rquickjs::Value> = args::array(&ctx, decoder).map_err(|e| {
-            minicbor::decode::Error::message(format!(
-                "failed to deserialize arguments: {}",
-                e.to_string()
-            ))
-        })?;
+        let arguments: Vec<rquickjs::Value> =
+            cbor::rquickjs::args::array(&ctx, decoder).map_err(|e| {
+                minicbor::decode::Error::message(format!(
+                    "failed to deserialize arguments: {}",
+                    e.to_string()
+                ))
+            })?;
 
         let mut args = Args::new(ctx.clone(), arguments.len());
         args.push_args(arguments).map_err(|e| {
@@ -166,12 +172,13 @@ fn cbor_decode_run_call_module_function(
     let fn_name = decoder.str()?;
 
     _ = ctx.with(|ctx| -> Result<(), minicbor::decode::Error> {
-        let arguments: Vec<rquickjs::Value> = args::array(&ctx, decoder).map_err(|e| {
-            minicbor::decode::Error::message(format!(
-                "failed to deserialize arguments: {}",
-                e.to_string()
-            ))
-        })?;
+        let arguments: Vec<rquickjs::Value> =
+            cbor::rquickjs::args::array(&ctx, decoder).map_err(|e| {
+                minicbor::decode::Error::message(format!(
+                    "failed to deserialize arguments: {}",
+                    e.to_string()
+                ))
+            })?;
 
         let mut args = Args::new(ctx.clone(), arguments.len());
         args.push_args(arguments).map_err(|e| {
@@ -215,25 +222,25 @@ pub(crate) fn cbor_decode_run_load(
         let b = decoder.bytes()?;
         if let Some(h) = b.get(0) {
             match h {
-                &con::EVAL => {
+                &LOAD_EVAL => {
                     run_load_eval(&b[1..], ctx)?;
                 }
-                &con::EVAL_FORMAT => {
+                &LOAD_EVAL_FORMAT => {
                     cbor_decode_run_load_eval_format(&mut Decoder::new(&b[1..]), ctx)?;
                 }
-                &con::DEFINE_VARS => {
+                &LOAD_DEFINE_VARS => {
                     cbor_decode_run_load_define_vars(&mut Decoder::new(&b[1..]), ctx)?;
                 }
-                &con::CALL_FUNCTION => {
+                &LOAD_CALL_FUNCTION => {
                     cbor_decode_run_call_function(&mut Decoder::new(&b[1..]), ctx)?;
                 }
-                &con::LOAD_MODULE_BYTECODE => {
+                &LOAD_LOAD_MODULE_BYTECODE => {
                     run_load_module_byte_code(&b[1..], ctx)?;
                 }
-                &con::LOAD_MODULE_JS => {
+                &LOAD_LOAD_MODULE_JS => {
                     cbor_decode_run_load_module_js(&mut Decoder::new(&b[1..]), ctx)?;
                 }
-                &con::CALL_MODULE_FUNCTION => {
+                &LOAD_CALL_MODULE_FUNCTION => {
                     cbor_decode_run_call_module_function(&mut Decoder::new(&b[1..]), ctx)?;
                 }
                 _ => Err(minicbor::decode::Error::message(format!(

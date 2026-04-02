@@ -1,8 +1,8 @@
-pub(crate) const EVAL: u8 = 0;
-pub(crate) const EVAL_FORMAT: u8 = 1;
-pub(crate) const JSON: u8 = 2;
-pub(crate) const DEFINE_VARS: u8 = 3;
-pub(crate) const CALL_FUNCTION: u8 = 4;
-pub(crate) const LOAD_MODULE_BYTECODE: u8 = 5;
-pub(crate) const LOAD_MODULE_JS: u8 = 6;
-pub(crate) const CALL_MODULE_FUNCTION: u8 = 7;
+use minicbor::data::Tag;
+
+// https://www.iana.org/assignments/cbor-tags/cbor-tags.xhtml (private tags)
+
+pub(crate) const ESCAPE: Tag = Tag::new(80000);
+pub(crate) const EVAL: Tag = Tag::new(80001);
+pub(crate) const EVAL_FORMAT: Tag = Tag::new(80002);
+pub(crate) const JSON: Tag = Tag::new(80003);

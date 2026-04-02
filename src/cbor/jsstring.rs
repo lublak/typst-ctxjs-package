@@ -1,6 +1,9 @@
 use minicbor::{data::Type, Decoder};
 
-use crate::cbor::{self, con};
+use crate::{
+    cbor::{self, con, rquickjs::args},
+    strfmt,
+};
 
 pub(crate) fn decode<'a, 'js>(decoder: &'a mut Decoder) -> Result<String, minicbor::decode::Error> {
     return Ok(match decoder.datatype()? {
@@ -21,59 +24,23 @@ pub(crate) fn decode<'a, 'js>(decoder: &'a mut Decoder) -> Result<String, minicb
         Type::F32 => decoder.f32()?.to_string(),
         Type::F64 => decoder.f64()?.to_string(),
         Type::Simple => decoder.simple()?.to_string(),
-        Type::Bytes => match decoder.bytes()? {
-            [b'$', b'_', b'{', s, b'}', b'_', b @ .., b'_', b'$', b'_', b'{', b'!', b'}'] => {
-                match s {
-                    &con::EVAL => String::from_utf8(b.to_vec()).map_err(|e| {
-                        minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(e)
-                    })?,
-                    &con::JSON => {
-                        if cbor::json::is_json(b) {
-                            String::from_utf8(b.to_vec()).map_err(|e| {
-                                minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(e)
-                            })?
-                        } else {
-                            Err(minicbor::decode::Error::type_mismatch(Type::Bytes)
-                                .with_message(""))?
-                        }
-                    }
-                    _ => {
-                        let mut jsstring = String::new();
-                        jsstring += "new Uint8Array([";
-                        let mut first = true;
+        Type::Bytes => {
+            let mut jsstring = String::new();
+            jsstring += "new Uint8Array([";
+            let mut first = true;
 
-                        for ele in b {
-                            if first {
-                                first = false
-                            } else {
-                                jsstring += ","
-                            }
-
-                            jsstring += &ele.to_string();
-                        }
-
-                        jsstring + "])"
-                    }
-                }
-            }
-            b => {
-                let mut jsstring = String::new();
-                jsstring += "new Uint8Array([";
-                let mut first = true;
-
-                for ele in b {
-                    if first {
-                        first = false
-                    } else {
-                        jsstring += ","
-                    }
-
-                    jsstring += &ele.to_string();
+            for ele in decoder.bytes()? {
+                if first {
+                    first = false
+                } else {
+                    jsstring += ","
                 }
 
-                jsstring + "])"
+                jsstring += &ele.to_string();
             }
-        },
+
+            jsstring + "])"
+        }
         Type::String => {
             format!("\"{}\"", decoder.str()?.replace("\"", "\\\""))
         }
@@ -105,6 +72,31 @@ pub(crate) fn decode<'a, 'js>(decoder: &'a mut Decoder) -> Result<String, minicb
 
             jsstring + "}"
         }
+        minicbor::data::Type::Tag => match decoder.tag()? {
+            con::ESCAPE => return decode(decoder),
+            con::EVAL => String::from_utf8(decoder.bytes()?.to_vec())
+                .map_err(|e| minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(e))?,
+            con::EVAL_FORMAT => String::from_utf8(
+                strfmt::strfmt(decoder.bytes()?, &args::string_map(decoder)?).map_err(|e| {
+                    minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(e)
+                })?,
+            )
+            .map_err(|e| minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(e))?,
+            con::JSON => {
+                let b = decoder.bytes()?;
+                if cbor::json::is_json(b) {
+                    String::from_utf8(b.to_vec()).map_err(|e| {
+                        minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(e)
+                    })?
+                } else {
+                    Err(minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(""))?
+                }
+            }
+            t => {
+                return Err(minicbor::decode::Error::tag_mismatch(t)
+                    .with_message(format!("unsupported tagged data {}", t)))
+            }
+        },
         other => {
             return Err(minicbor::decode::Error::type_mismatch(other)
                 .with_message("unknown or unsupported type"))
