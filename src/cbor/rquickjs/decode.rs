@@ -134,7 +134,6 @@ pub(crate) fn decode<'a, 'js>(
             rquickjs::Value::from_object(object)
         }
         Type::Tag => match decoder.tag()? {
-            con::ESCAPE => decode(decoder, ctx)?,
             con::EVAL => eval(decoder, ctx)?,
             con::EVAL_FORMAT => eval_format(decoder, ctx)?,
             con::JSON => json(decoder, ctx)?,

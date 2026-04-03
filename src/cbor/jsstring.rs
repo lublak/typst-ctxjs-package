@@ -73,7 +73,6 @@ pub(crate) fn decode<'a, 'js>(decoder: &'a mut Decoder) -> Result<String, minicb
             jsstring + "}"
         }
         minicbor::data::Type::Tag => match decoder.tag()? {
-            con::ESCAPE => return decode(decoder),
             con::EVAL => String::from_utf8(decoder.bytes()?.to_vec())
                 .map_err(|e| minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(e))?,
             con::EVAL_FORMAT => String::from_utf8(
