@@ -8,7 +8,7 @@ pub fn strfmt(s: &[u8], m: &HashMap<&str, String>) -> Result<Vec<u8>, Utf8Error>
         match s[i] {
             b'{' => {
                 i += 1;
-                let key_start = i;
+                let mut key_start = i;
                 while i < l {
                     let c = s[i];
                     match c {
@@ -27,8 +27,13 @@ pub fn strfmt(s: &[u8], m: &HashMap<&str, String>) -> Result<Vec<u8>, Utf8Error>
                             i += 1;
                             break;
                         }
-                        (b'a'..=b'z') | (b'A'..=b'Z') | (b'0'..=b'9') => {
+                        (b'a'..=b'z') | (b'A'..=b'Z') | (b'0'..=b'9') | b'_' | b'-' => {
                             i += 1;
+                        }
+                        b'{' => {
+                            output.push(b'{');
+                            i += 1;
+                            key_start = i;
                         }
                         _ => {
                             output.push(b'{');
@@ -84,5 +89,7 @@ mod tests {
         ));
 
         assert!(test(b"test {open value", &kv, b"test {open value"));
+
+        assert!(test(b"{{key}", &kv, b"{value"));
     }
 }
