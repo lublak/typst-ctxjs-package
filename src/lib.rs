@@ -11,23 +11,19 @@ mod strfmt;
 
 initiate_protocol!();
 
-struct ContextHolder(Option<Context>);
-unsafe impl Send for ContextHolder {}
-unsafe impl Sync for ContextHolder {}
-
-static mut CURRENT_CONTEXT: ContextHolder = ContextHolder(None);
+static mut CURRENT_CONTEXT: Option<Context> = None;
 static mut CURRENT_VALUE: Option<Vec<u8>> = None;
 
 #[inline(always)]
 #[allow(static_mut_refs)]
 fn get_current_context() -> Result<Context, String> {
-    return Ok(unsafe { CURRENT_CONTEXT.0.to_owned().ok_or_else(|| "context empty") }?);
+    return Ok(unsafe { CURRENT_CONTEXT.to_owned().ok_or_else(|| "context empty") }?);
 }
 
 #[inline(always)]
 fn set_current_context(ctx: Context) {
     unsafe {
-        CURRENT_CONTEXT.0 = Some(ctx);
+        CURRENT_CONTEXT = Some(ctx);
     }
 }
 
