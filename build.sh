@@ -1,5 +1,5 @@
-if [ ! -d "binaryen-version_128" ]; then
-    curl -L https://github.com/WebAssembly/binaryen/releases/download/version_128/binaryen-version_128-x86_64-linux.tar.gz | tar zx
+if [ ! -d "binaryen-version_129" ]; then
+    curl -L https://github.com/WebAssembly/binaryen/releases/download/version_129/binaryen-version_129-x86_64-linux.tar.gz | tar zx
 fi
 if [ ! -d "wasm-minimal-protocol" ]; then
     git clone https://github.com/astrale-sharp/wasm-minimal-protocol
@@ -12,4 +12,4 @@ cp README.md typst-package/
 cp LICENSE typst-package/
 cargo build --release --target wasm32-wasip1
 ./wasm-minimal-protocol/target/release/wasi-stub -r 0 ./target/wasm32-wasip1/release/ctxjs.wasm -o typst-package/ctxjs.wasm
-./binaryen-version_128/bin/wasm-opt typst-package/ctxjs.wasm -O3 --enable-bulk-memory -o typst-package/ctxjs.wasm 
+./binaryen-version_129/bin/wasm-opt typst-package/ctxjs.wasm -O3 --enable-bulk-memory -o typst-package/ctxjs.wasm 
