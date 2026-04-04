@@ -138,8 +138,8 @@ It is recommend to build your own js file to an esm file and create bytecode fro
 
 == working with context
 
-On calling any ctx file a new or the current context gets returned with a value as an array.
-Its recommend always use the deconstruct instruduction to be safe that we are always use the correct context.
+On calling any ctx function a new or the current context gets returned with a value as an array.
+Its recommend always use the destructuring syntax to be safe that we are always use the correct context.
 ```example
 #let (current-context, value) = ctx.eval(current-context, "123")
 #value
