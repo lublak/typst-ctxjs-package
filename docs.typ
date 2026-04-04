@@ -34,7 +34,7 @@
   ),
   label-prefix: "ctxjs.",
 )
-#tidy.show-module(docs, style: tidy.styles.default, first-heading-level: 2))
+#tidy.show-module(docs, style: tidy.styles.default, first-heading-level: 2)
 #pagebreak()
 #let docs = tidy.parse-module(
   read("typst-package/ctx.typ"),
@@ -80,7 +80,7 @@ cargo run --manifest-path typst-ctxjs-package/Cargo.toml --bin ctxjs_module_byte
 
 It uses the modulename to compile the module code and write the bytecode to the kbc1 file.
 
-== Examples
+== Guide
 
 #let mainjs = read("example/main.js")
 #let current-context = ctxjs.new-context(
@@ -136,41 +136,61 @@ It is recommend to build your own js file to an esm file and create bytecode fro
 )
 ```
 
+== working with context
+
+On calling any ctx file a new or the current context gets returned with a value as an array.
+Its recommend always use the deconstruct instruduction to be safe that we are always use the correct context.
+```example
+#let (current-context, value) = ctx.eval(current-context, "123")
+#value
+```
+If you do not need the value, its safe to ignore it:
+```example
+#let (current-context, _) = ctx.eval(current-context, "123")
+value gets ignored
+```
+
 === image-data-url
 
 Calls a javascript which takes a base64 image and returns a svg string embedding the base64 image.
 
 ```example
-<<<#let logo_svg = bytes(
-<<<  ctx.call-function(current-context, "create_svg", (value.image-data-url(read("examples/Typst.svg.png", encoding: none)))).at(1),
-<<<)
->>>>>>#let logo_svg = bytes(
->>>  ctx.call-function(current-context, "create_svg", (value.image-data-url(data.logo))).at(1),
->>>)
+<<<#let (current-context, value) = ctx.call-function(current-context, "create_svg", (value.image-data-url(read("examples/Typst.svg.png", encoding: none))))
+<<<
+>>>#let (current-context, value) = ctx.call-function(current-context, "create_svg", (value.image-data-url(data.logo)))
+>>>#let logo_svg = bytes(value)
 #image(logo_svg)
 #str(logo_svg).slice(0, 5)...#str(logo_svg).slice(100, 120)...#str(logo_svg).slice(145, 170)...
 ```
 === eval-format
 Evaluate js directly with formatting data.
 ```example
-#ctx.eval-format(current-context, "`Result for {val1}+{val2} is ${{val1}+{val2}}`", val1: 1, val2: 2).at(1)
+#let (current-context, value) = ctx.eval-format(current-context, "`Result for {val1}+{val2} is ${{val1}+{val2}}`", val1: 1, val2: 2)
+#value
 ```
 === transition
 A small example to show the difference with transition and without transition.
 ```example
+// new context must be stored
 #let (current-context, result) = ctx.call-function(current-context, "changes_data", transition: true)
+// With transition:
+#result
 
-With transition: #result
+//changes_data gets called counter will increased and returned. The counter state will be saved with transition.
 
-changes_data gets called counter will increased and returned. The counter state will be saved with transition.
+// Without transition:
+#let (current-context, result) = ctx.call-function(current-context, "changes_data")
+#result
 
-Without transition: #ctx.call-function(current-context, "changes_data").at(1)
+//changes_data gets called counter will increased and returned. Now the counter will keep the same state as if the function had never been called.
 
-changes_data gets called counter will increased and returned. Now the counter will keep the same state as if the function had never been called.
+// its mostly recommend always store the returning context (just to be safe)
+#let (current-context, result) = ctx.call-function(current-context, "changes_data")
 
-After: #ctx.call-function(current-context, "changes_data").at(1)
+// After:
+#result
 
-Because the counter was not change its still the same as the last call.
+//Because the counter was not change its still the same as the last call.
 ```
 
 === value
