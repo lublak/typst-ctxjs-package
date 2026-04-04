@@ -58,7 +58,7 @@ pub(crate) fn decode<'a, 'js>(
     decoder: &'a mut Decoder,
     ctx: &Ctx<'js>,
 ) -> Result<Value<'js>, minicbor::decode::Error> {
-    return Ok(match decoder.datatype()? {
+    Ok(match decoder.datatype()? {
         Type::Bool => rquickjs::Value::new_bool(ctx.clone(), decoder.bool()?),
         Type::Null => Value::new_null(ctx.clone()),
         Type::Undefined => Value::new_undefined(ctx.clone()),
@@ -102,9 +102,17 @@ pub(crate) fn decode<'a, 'js>(
         Type::F32 => Value::new_float(ctx.clone(), decoder.f32()?.into()),
         Type::F64 => Value::new_float(ctx.clone(), decoder.f64()?.into()),
         Type::Simple => Value::new_int(ctx.clone(), decoder.simple()?.into()),
-        Type::Bytes => rquickjs::TypedArray::new(ctx.clone(), decoder.bytes()?)
-            .map_err(|err| minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err))?
-            .into_value(),
+        Type::Bytes => match decoder.bytes()? {
+            // $ctxjs_cbor_
+            [b'$', b'c', b't', b'x', b'j', b's', b'_', b'c', b'b', b'o', b'r', b'_', b @ ..] => {
+                decode(&mut Decoder::new(b), ctx)?
+            }
+            b => rquickjs::TypedArray::new(ctx.clone(), b)
+                .map_err(|err| {
+                    minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err)
+                })?
+                .into_value(),
+        },
         Type::String => rquickjs::String::from_str(ctx.clone(), decoder.str()?)
             .map_err(|err| minicbor::decode::Error::type_mismatch(Type::String).with_message(err))?
             .into_value(),
@@ -134,6 +142,11 @@ pub(crate) fn decode<'a, 'js>(
             rquickjs::Value::from_object(object)
         }
         Type::Tag => match decoder.tag()? {
+            con::RAW_BYTES => rquickjs::TypedArray::new(ctx.clone(), decoder.bytes()?)
+                .map_err(|err| {
+                    minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(err)
+                })?
+                .into_value(),
             con::EVAL => eval(decoder, ctx)?,
             con::EVAL_FORMAT => eval_format(decoder, ctx)?,
             con::JSON => json(decoder, ctx)?,
@@ -145,5 +158,5 @@ pub(crate) fn decode<'a, 'js>(
         other => {
             return Err(minicbor::decode::Error::type_mismatch(other).with_message("unknown type"))
         }
-    });
+    })
 }

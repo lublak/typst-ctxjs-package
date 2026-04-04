@@ -24,23 +24,29 @@ pub(crate) fn decode<'a, 'js>(decoder: &'a mut Decoder) -> Result<String, minicb
         Type::F32 => decoder.f32()?.to_string(),
         Type::F64 => decoder.f64()?.to_string(),
         Type::Simple => decoder.simple()?.to_string(),
-        Type::Bytes => {
-            let mut jsstring = String::new();
-            jsstring += "new Uint8Array([";
-            let mut first = true;
+        Type::Bytes => match decoder.bytes()? {
+            // $ctxjs_cbor_
+            [b'$', b'c', b't', b'x', b'j', b's', b'_', b'c', b'b', b'o', b'r', b'_', b @ ..] => {
+                decode(&mut Decoder::new(b))?
+            }
+            b => {
+                let mut jsstring = String::new();
+                jsstring += "new Uint8Array([";
+                let mut first = true;
 
-            for ele in decoder.bytes()? {
-                if first {
-                    first = false
-                } else {
-                    jsstring += ","
+                for ele in b {
+                    if first {
+                        first = false
+                    } else {
+                        jsstring += ","
+                    }
+
+                    jsstring += &ele.to_string();
                 }
 
-                jsstring += &ele.to_string();
+                jsstring + "])"
             }
-
-            jsstring + "])"
-        }
+        },
         Type::String => {
             format!("\"{}\"", decoder.str()?.replace("\"", "\\\""))
         }
@@ -73,6 +79,23 @@ pub(crate) fn decode<'a, 'js>(decoder: &'a mut Decoder) -> Result<String, minicb
             jsstring + "}"
         }
         minicbor::data::Type::Tag => match decoder.tag()? {
+            con::RAW_BYTES => {
+                let mut jsstring = String::new();
+                jsstring += "new Uint8Array([";
+                let mut first = true;
+
+                for ele in decoder.bytes()? {
+                    if first {
+                        first = false
+                    } else {
+                        jsstring += ","
+                    }
+
+                    jsstring += &ele.to_string();
+                }
+
+                jsstring + "])"
+            }
             con::EVAL => String::from_utf8(decoder.bytes()?.to_vec())
                 .map_err(|e| minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(e))?,
             con::EVAL_FORMAT => String::from_utf8(

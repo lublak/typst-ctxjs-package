@@ -173,12 +173,12 @@ Like a function callback or a pure json document.
 
 This is possible via the value module.
 
-/*
+
 ```example
->>>#ctx.eval-format(current-context, "call_callback({test})", test: value.eval("function() {return `world`;}"))
+#ctx.eval-format(current-context, "call_callback({test})", test: value.eval("function() {return `world`;}"))
 ```
 
 ```example
 #ctx.eval-format(current-context, "pure_json({test})", test: value.json("{\"arr\":[1,2,3,4]}"))
 ```
-*/
+

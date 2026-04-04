@@ -13,9 +13,10 @@
 // ! same as cbor/con.rs ! //
 // https://www.iana.org/assignments/cbor-tags/cbor-tags.xhtml (private tags)
 
-#let eval = 80000
-#let eval-format = 80001
-#let json = 80002
+#let raw-bytes = 80000
+#let eval = 80001
+#let eval-format = 80002
+#let json = 80003
 
 
 // ! additional ! //
@@ -27,22 +28,27 @@
 
 #let create-cbor-type-with-len-bytes(t, l) = {
   if l <= 0x17 {
-    return bytes((t.bit-or(l),))
+    return t.bit-or(l).to-bytes(size: 1, endian: "big")
   }
   if l <= 0xff {
-    return bytes((t.bit-or(24), l))
+    return t.bit-or(24).to-bytes(size: 1, endian: "big") + l.to-bytes(size: 1, endian: "big")
   }
   if l <= 0xffff {
-    return bytes((t.bit-or(25),)) + l.to-bytes(size: 2)
+    return t.bit-or(25).to-bytes(size: 1, endian: "big") + l.to-bytes(size: 2, endian: "big")
   }
   if l <= 0xffffffff {
-    return bytes((t.bit-or(26),)) + l.to-bytes(size: 4)
+    return t.bit-or(26).to-bytes(size: 1, endian: "big") + l.to-bytes(size: 4, endian: "big")
   }
-  return bytes((t.bit-or(27),)) + l.to-bytes()
+  return t.bit-or(27).to-bytes(size: 1, endian: "big") + l.to-bytes(size: 8, endian: "big")
 }
 
 #let cbor-tagged-data(tag, cbordata) = {
-  return create-cbor-type-with-len-bytes(cbor-tag-type, tag) + cbordata
+  return (
+    bytes("$ctxjs_cbor_")
+      + cbor-tag-type.bit-or(27).to-bytes(size: 1, endian: "big")
+      + tag.to-bytes(size: 8, endian: "big")
+      + cbordata
+  )
 }
 
 #let build-load-argument(t, value) = {

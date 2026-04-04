@@ -1,8 +1,23 @@
 #import "internal.typ" as _internal
 
+/// If the data contains a `$ctxjs_cbor_` header the value gets interpreted as a cbor value.
+/// This is currently a workaround, because typst currently doesn't support directly tagged cbor data.
+/// To "escape" your bytes and send them as raw bytes with a `$ctxjs_cbor_` header use this function.
+/// ```examplec
+/// ctxjs.value.raw-bytes(bytes("$ctxjs_cbor_should_be_not_interpreted"))
+/// ```
+/// -> bytes
+#let raw-bytes(
+  /// the bytes that shoud not interpreted as a cbor value
+  /// -> bytes
+  b,
+) = {
+  _internal.cbor-tagged-data(_internal.raw-bytes, cbor.encode(b))
+}
+
 /// Typst *does not* support a js function as a returning value: `#ctxjs.ctx.eval(ctx, "function() {}")`.
 /// So as an alternative `ctxjs.value.eval` can be used,
-/// which returns a special formated bytes value with raw js code.
+/// which returns a special formated bytes (`$ctxjs_cbor_` + tagged cbor) with raw js code.
 ///
 /// `#ctxjs.ctx.call-function(ctx, "fnname", (ctxjs.value.eval("function(args) { return true; }"),))`
 ///
@@ -21,7 +36,7 @@
   _internal.cbor-tagged-data(_internal.eval, cbor.encode(bytes(js)))
 }
 
-/// Similar to @eval the function returns a special formated bytes value with raw js code.
+/// Similar to @eval the function returns a special formated bytes (`$ctxjs_cbor_` + tagged cbor) with raw js code.
 /// Additional it supports formatting of the eval code with typst values.
 /// ```examplec
 /// ctxjs.value.eval-format("{val1}+{val2}", val1: 1, val2: 2)
@@ -35,10 +50,10 @@
   /// -> any
   ..args,
 ) = {
-  _internal.cbor-tagged-data(_internal.eval-format, cbor.encode((js, args.named())))
+  _internal.cbor-tagged-data(_internal.eval-format, cbor.encode((bytes(js), args.named())))
 }
 
-/// Similar to @eval the function returns a special formated bytes value but with raw json code which will be also validated as pure json code in ctxjs.
+/// Similar to @eval the function returns a special formated bytes (`$ctxjs_cbor_` + tagged cbor) but with raw json code which will be also validated as pure json code in ctxjs.
 /// ```examplec
 /// ctxjs.value.json("{}")
 /// ```
