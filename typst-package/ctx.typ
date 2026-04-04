@@ -1,88 +1,263 @@
 #import "internal.typ" as _internal
 
-#let load(ctx, ..load) = {
-  let args = load.pos()
-  let data = bytes((_internal.cbor-array-type + args.len(),))
-  for value in args {
-    data = data + value
-  }
+/// Loads the load bytes and always creates a new context.
+/// ```examplec
+/// ctxjs.ctx.load(
+///   current-context,
+///   ctxjs.load.eval("function fn() {}"),
+/// )
+/// ```
+/// -> (ctx: <module>, value: none)
+#let load(
+  /// the context in which this function should run.
+  /// -> <module>
+  ctx,
+  /// load bytes `created by ctxjs.load.*`
+  /// -> bytes
+  ..load,
+) = {
   (
-    ctx: plugin.transition(ctx.load, data),
+    ctx: plugin.transition(ctx.load, _internal.build-load-data(load.pos())),
     value: none,
   )
 }
 
-#let eval(ctx, js, transition: false) = {
+/// Evaluates the js code. It will returns a new context if transition is enabled, the current context if not and the value which returns from the js code.
+/// ```examplec
+/// ctxjs.ctx.eval(
+///   current-context,
+///   "1+1"
+/// )
+/// ```
+/// -> (ctx: <module>, value: any)
+#let eval(
+  /// the context in which this function should run
+  /// -> <module>
+  ctx,
+  /// the js code which should be evaluate
+  /// -> str | bytes
+  js,
+  /// if a new context should be created (with changed data)
+  /// -> bool
+  transition: false,
+) = {
   _internal.transition-call(
     ctx,
     ctx.eval,
     transition,
-    _internal.string-to-bytes(js),
+    bytes(js),
   )
 }
 
-#let eval-format(ctx, js, args, transition: false) = {
+/// Evaluates the js code. It will returns a new context if transition is enabled, the current context if not and the value which returns from the js code. Additional to @eval it supports formatting of the eval code with typst values.
+///
+/// ```examplec
+/// ctxjs.ctx.eval(
+///   current-context,
+///   "1+1"
+/// )
+/// ```
+/// -> (ctx: <module>, value: any)
+#let eval-format(
+  /// the context in which this function should run
+  /// -> <module>
+  ctx,
+  /// the js code which should be evaluate
+  /// -> str | bytes
+  js,
+  /// named args which replaces the name in the js code with the typst value as js value, only characters a-zA-Z0-9\_- as name are allowed
+  /// -> any
+  ..args,
+  /// if a new context should be created (with changed data)
+  /// -> bool
+  transition: false,
+) = {
   _internal.transition-call(
     ctx,
     ctx.eval_format,
     transition,
-    _internal.string-to-bytes(js),
-    cbor.encode(args),
+    bytes(js),
+    cbor.encode(args.named()),
   )
 }
 
-#let define-vars(ctx, vars, transition: false) = {
-  _internal.transition-call(
-    ctx,
-    ctx.define_vars,
-    transition,
-    cbor.encode(vars),
+/// Defines vars in a new context with given values.
+/// ```examplec
+/// ctxjs.ctx.define-vars(
+///   current-context,
+///   varname: "value"
+/// )
+/// ```
+/// -> (ctx: <module>, value: none)
+#let define-vars(
+  /// the context in which this function should run
+  /// -> <module>
+  ctx,
+  /// the context in which this function should run
+  /// -> any
+  ..vars,
+) = {
+  (
+    ctx: plugin.transition(ctx.define_vars, cbor.encode(vars.named())),
+    value: none,
   )
 }
 
-#let call-function(ctx, fnname, args, transition: false) = {
+/// Calls a js function by function name with an args.
+/// ```examplec
+/// let (ctx: current-context,) = ctxjs.ctx.eval(
+///   current-context,
+///   "function fnname() { return 1; }",
+///   transition: true
+/// )
+/// ctxjs.ctx.call-function(
+///   current-context,
+///   "fnname",
+///   varname: "value"
+/// )
+/// ```
+/// -> (ctx: <module>, value: any)
+#let call-function(
+  /// the context in which this function should run
+  /// -> <module>
+  ctx,
+  /// the function name
+  /// -> str
+  fnname,
+  /// the args for the function
+  /// -> any
+  ..args,
+  /// if a new context should be created (with changed data)
+  /// -> bool
+  transition: false,
+) = {
   _internal.transition-call(
     ctx,
     ctx.call_function,
     transition,
-    _internal.string-to-bytes(fnname),
-    cbor.encode(args),
-    _internal.string-to-bytes(type-field),
+    bytes(fnname),
+    cbor.encode(args.pos()),
   )
 }
 
-#let load-module-bytecode(ctx, bytecode) = {
+/// Loads bytecode into a new context.
+/// ```examplec
+/// <<<ctxjs.ctx.load-module-bytecode(
+/// <<<  current-context,
+/// <<<  read("bytecode.kbc1", encoding: none),
+/// <<<)
+/// >>> (ctx: current-context,value: none)
+/// ```
+/// -> (ctx: <module>, value: none)
+#let load-module-bytecode(
+  /// the context in which this function should run
+  /// -> <module>
+  ctx,
+  /// the bytecode mostly created by the @ctxjs_module_bytecode_builder
+  /// -> bytes
+  bytecode,
+) = {
   (
     ctx: plugin.transition(ctx.load_module_bytecode, bytecode),
     value: none,
   )
 }
 
-#let load-module-js(ctx, modulename, module) = {
+/// Loads js module code into a new context.
+/// ```examplec
+/// ctxjs.ctx.load-module-js(
+///   current-context,
+///   "test_module",
+///   "export function test() {}",
+/// )
+/// ```
+/// -> (ctx: <module>, value: none)
+#let load-module-js(
+  /// the context in which this function should run
+  /// -> <module>
+  ctx,
+  /// the module name
+  /// -> str
+  modulename,
+  /// the js module code
+  /// -> str | bytes
+  module,
+) = {
   (
     ctx: plugin.transition(
       ctx.load_module_js,
-      _internal.string-to-bytes(modulename),
-      _internal.string-to-bytes(module),
+      bytes(modulename),
+      bytes(module),
     ),
     value: none,
   )
 }
 
-#let call-module-function(ctx, modulename, fnname, args, transition: false) = {
+/// Calls a js function in a module by function name with an args.
+/// ```examplec
+/// let (ctx: current-context,) =  ctxjs.ctx.load-module-js(
+///   current-context,
+///   "test_module",
+///   "export function test() {return \"foo\";}",
+/// )
+/// ctxjs.ctx.call-module-function(
+///   current-context,
+///   "test_module",
+///   "test",
+///   varname: "value"
+/// )
+/// ```
+/// -> (ctx: <module>, value: any)
+#let call-module-function(
+  /// the context in which this function should run
+  /// -> <module>
+  ctx,
+  /// the module name
+  /// -> str
+  modulename,
+  /// the function name
+  /// -> str
+  fnname,
+  /// the args for the function
+  /// -> any
+  ..args,
+  /// if a new context should be created (with changed data)
+  /// -> bool
+  transition: false,
+) = {
   _internal.transition-call(
     ctx,
     ctx.call_module_function,
     transition,
-    _internal.string-to-bytes(modulename),
-    _internal.string-to-bytes(fnname),
-    cbor.encode(args),
+    bytes(modulename),
+    bytes(fnname),
+    cbor.encode(args.pos()),
   )
 }
 
-#let get-module-properties(ctx, modulename) = {
+/// Get all properties from a module.
+/// ```examplec
+/// let (ctx: current-context,) =  ctxjs.ctx.load-module-js(
+///   current-context,
+///   "test_module",
+///   "export const key1 = 1;export const key2 = 1;",
+/// )
+/// ctxjs.ctx.get-module-properties(
+///   current-context,
+///   "test_module",
+/// )
+/// ```
+/// -> (ctx: <module>, value: array)
+#let get-module-properties(
+  /// the context in which this function should run
+  /// -> <module>
+  ctx,
+  /// the module name
+  /// -> str
+  modulename,
+) = {
   (
     ctx: ctx,
-    value: cbor(ctx.get_module_properties(_internal.string-to-bytes(modulename))),
+    value: cbor(ctx.get_module_properties(bytes(modulename))),
   )
 }

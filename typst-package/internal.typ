@@ -1,29 +1,60 @@
 #let wasm = plugin("ctxjs.wasm")
 
+// ! same as cbor_load.rs ! //
+
+#let load-eval = 0
+#let load-eval-format = 1
+#let load-define-vars = 2
+#let load-call-function = 3;
+#let load-load-module-bytecode = 4;
+#let load-load-module-js = 5;
+#let load-call-module-function = 6;
+
 // ! same as cbor/con.rs ! //
+// https://www.iana.org/assignments/cbor-tags/cbor-tags.xhtml (private tags)
 
+#let eval = 80000
+#let eval-format = 80001
+#let json = 80002
 
-#let eval = 0
-#let eval-format = 1
-#let json = 2
-#let define-vars = 3
-#let call-function = 4;
-#let load-module-bytecode = 5;
-#let load-module-js = 6;
-#let call-module-function = 7;
 
 // ! additional ! //
 
 
-#let cbor-byte-type = 64
-#let cbor-array-type = 128
+#let cbor-bytes-type = 0x40
+#let cbor-array-type = 0x80
+#let cbor-tag-type = 0xc0
 
+#let create-cbor-type-with-len-bytes(t, l) = {
+  if l <= 0x17 {
+    return bytes((t.bit-or(l),))
+  }
+  if l <= 0xff {
+    return bytes((t.bit-or(24), l))
+  }
+  if l <= 0xffff {
+    return bytes((t.bit-or(25),)) + l.to-bytes(size: 2)
+  }
+  if l <= 0xffffffff {
+    return bytes((t.bit-or(26),)) + l.to-bytes(size: 4)
+  }
+  return bytes((t.bit-or(27),)) + l.to-bytes()
+}
 
-#let bytes-with-type(type, value) = {
-  assert(type(type) == int, "type is not an int")
-  assert(type > 255, "type is bigger than 255")
+#let cbor-tagged-data(tag, cbordata) = {
+  return create-cbor-type-with-len-bytes(cbor-tag-type, tag) + cbordata
+}
 
-  return bytes("$_{" + str(type) + "}_") + bytes(value) + bytes("_$_{!}")
+#let build-load-argument(t, value) = {
+  create-cbor-type-with-len-bytes(cbor-bytes-type, value.len() + 1) + bytes((t,)) + value
+}
+
+#let build-load-data(load) = {
+  let data = create-cbor-type-with-len-bytes(cbor-array-type, load.len())
+  for value in load {
+    data = data + value
+  }
+  data
 }
 
 #let transition-call(ctx, fn, transition, ..args) = {
@@ -33,21 +64,10 @@
       ctx: ctx,
       value: cbor(ctx.stored_value()),
     )
+  } else {
+    return (
+      ctx: ctx,
+      value: cbor(fn(..args.pos(), bytes((0,)))),
+    )
   }
-  return (
-    ctx: ctx,
-    value: cbor(fn(..args.pos(), bytes((0,)))),
-  )
-}
-
-#let string-to-bytes(data) = {
-  let data = data
-  if type(data) == str {
-    data = bytes(data)
-  } else if type(data) == array {
-    data = bytes(data)
-  } else if type(data) == content {
-    data = bytes(data.text)
-  }
-  data
 }

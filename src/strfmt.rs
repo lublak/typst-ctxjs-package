@@ -91,5 +91,6 @@ mod tests {
         assert!(test(b"test {open value", &kv, b"test {open value"));
 
         assert!(test(b"{{key}", &kv, b"{value"));
+        assert!(test(b"{key}}", &kv, b"value}"));
     }
 }

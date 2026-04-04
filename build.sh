@@ -13,3 +13,5 @@ cp LICENSE typst-package/
 cargo build --release --target wasm32-wasip1
 ./wasm-minimal-protocol/target/release/wasi-stub -r 0 ./target/wasm32-wasip1/release/ctxjs.wasm -o typst-package/ctxjs.wasm
 ./binaryen-version_129/bin/wasm-opt typst-package/ctxjs.wasm -O3 --enable-bulk-memory -o typst-package/ctxjs.wasm 
+
+typst compile --root . docs.typ

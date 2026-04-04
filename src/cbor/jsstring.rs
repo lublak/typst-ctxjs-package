@@ -88,7 +88,8 @@ pub(crate) fn decode<'a, 'js>(decoder: &'a mut Decoder) -> Result<String, minicb
                         minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(e)
                     })?
                 } else {
-                    Err(minicbor::decode::Error::type_mismatch(Type::Bytes).with_message(""))?
+                    Err(minicbor::decode::Error::type_mismatch(Type::Bytes)
+                        .with_message("invalid json"))?
                 }
             }
             t => {

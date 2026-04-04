@@ -321,8 +321,11 @@ fn get_module_properties(module_name: &[u8]) -> Result<Vec<u8>, String> {
             .map_err(|e| format!("failed to finish module import: {}", e.to_string()))?;
 
         let mut encoder = Encoder::new(Vec::new());
-
-        for key in m.keys() {
+        let keys = m.keys();
+        encoder
+            .array(keys.len() as _)
+            .map_err(|e| format!("failed to serialize results: {}", e.to_string()))?;
+        for key in keys {
             let key: String = key
                 .catch(&ctx)
                 .map_err(|e| format!("can not collect module keys: {}", e.to_string()))?;
@@ -334,6 +337,24 @@ fn get_module_properties(module_name: &[u8]) -> Result<Vec<u8>, String> {
 
         Ok(encoder.into_writer())
     })
+}
+
+// https://github.com/bojand/infer/pull/119
+pub fn is_svg(buf: &[u8]) -> bool {
+    if buf.starts_with(b"<svg") {
+        return true;
+    }
+
+    // Avoid conflicts with other XML types while detecting SVGs.
+    if buf.starts_with(b"<?xml") {
+        return buf
+            .get(..256)
+            .unwrap_or(buf)
+            .windows(4)
+            .any(|w| w == b"<svg");
+    }
+
+    false
 }
 
 #[wasm_func]
@@ -349,7 +370,7 @@ pub fn image_data_url(data: &[u8], format: &[u8]) -> Result<Vec<u8>, String> {
             t = "jpeg"
         } else if infer::image::is_gif(data) {
             t = "gif"
-        } else if infer::text::is_xml(data) {
+        } else if is_svg(data) {
             t = "svg"
         } else {
             return Err("data not supported".to_owned());

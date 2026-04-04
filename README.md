@@ -1,5 +1,7 @@
 # CtxJS
 
+## Description
+
 A typst plugin to evaluate javascript code.
 
 - multiple javascript contexts
@@ -13,28 +15,12 @@ A typst plugin to evaluate javascript code.
 - allow loading json directly
 - convert images to data urls
 
-## Example
+## An actively used package
 
-```typst
-#import "@preview/ctxjs:0.4.0"
-#import ctxjs.load
-#import ctxjs.ctx
+To get a picture what is possible with ctxjs there is a package based on echarts embedded into typst.
+It uses a custom js module code to wrap the echarts code in a single function.
+The package uses ctxjs_module_bytecode_builder to build the js module code into bytecode.
+And it get loaded by typst into a context and the js function gets called.
+Which than returns an svg which can be used on the typst side.
 
-#{
-  let dataurl = ctxjs.image-data-url("path_or_bytes.png")
-  let newcontext = ctxjs.new-context(
-    load: (
-      load.eval("function test(data) {return data + 2;}"),
-    )
-  )
-  let returns-4 = ctx.call-function(newcontext, "test", (2,))
-  let returns-6 = ctx.eval-format(newcontext, "test({test})", (test: 4))
-  let code = ```
-    export function another_test_function() { return {data: 'test'}; }
-  ```;
-  let anothernewcontext = ctx.load-module-js(newcontext, "module_name", code.text)
-  let returns-array-with-another-test = ctx.get-module-properties(anothernewcontext, "module_name")
-  let returns-data-with-test-string = ctx.call-module-function(anothernewcontext, "module_name", "another_test_function", ())
-  let returns-8 = ctx.eval-format(anothernewcontext, "test({test})", (test: ctx.eval-later("4 + 4")))
-}
-```
+[Echarm](https://github.com/lublak/typst-echarm-package)
