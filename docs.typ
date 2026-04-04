@@ -137,31 +137,31 @@ Calls a javascript which takes a base64 image and returns a svg string embedding
 
 ```example
 <<<#image(bytes(
-<<<  ctx.call-function(current-context, "create_svg", (value.image-data-url(read("examples/Typst.svg.png", encoding: none)))).value,
+<<<  ctx.call-function(current-context, "create_svg", (value.image-data-url(read("examples/Typst.svg.png", encoding: none)))).at(1),
 <<<))
 >>>#image(bytes(
->>>  ctx.call-function(current-context, "create_svg", (value.image-data-url(data.logo))).value,
+>>>  ctx.call-function(current-context, "create_svg", (value.image-data-url(data.logo))).at(1),
 >>>))
 ```
 === eval-format
 Evaluate js directly with formatting data.
 ```example
-#ctx.eval-format(current-context, "`Result for {val1}+{val2} is ${{val1}+{val2}}`", val1: 1, val2: 2).value
+#ctx.eval-format(current-context, "`Result for {val1}+{val2} is ${{val1}+{val2}}`", val1: 1, val2: 2).at(1)
 ```
 === transition
 A small example to show the difference with transition and without transition.
 ```example
-#let (ctx: current-context, value: result) = ctx.call-function(current-context, "changes_data", transition: true)
+#let (current-context, result) = ctx.call-function(current-context, "changes_data", transition: true)
 
 With transition: #result
 
 changes_data gets called counter will increased and returned. The counter state will be saved with transition.
 
-Without transition: #ctx.call-function(current-context, "changes_data").value
+Without transition: #ctx.call-function(current-context, "changes_data").at(1)
 
 changes_data gets called counter will increased and returned. Now the counter will keep the same state as if the function had never been called.
 
-After: #ctx.call-function(current-context, "changes_data").value
+After: #ctx.call-function(current-context, "changes_data").at(1)
 
 Because the counter was not change its still the same as the last call.
 ```

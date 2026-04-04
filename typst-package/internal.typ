@@ -67,13 +67,13 @@
   if transition {
     ctx = plugin.transition(fn, ..args.pos(), bytes((1,)))
     return (
-      ctx: ctx,
-      value: cbor(ctx.stored_value()),
+      ctx,
+      cbor(ctx.stored_value()),
     )
   } else {
     return (
-      ctx: ctx,
-      value: cbor(fn(..args.pos(), bytes((0,)))),
+      ctx,
+      cbor(fn(..args.pos(), bytes((0,)))),
     )
   }
 }

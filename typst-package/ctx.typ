@@ -7,7 +7,7 @@
 ///   ctxjs.load.eval("function fn() {}"),
 /// )
 /// ```
-/// -> (ctx: <module>, value: none)
+/// -> (<module>, none)
 #let load(
   /// the context in which this function should run.
   /// -> <module>
@@ -17,8 +17,8 @@
   ..load,
 ) = {
   (
-    ctx: plugin.transition(ctx.load, _internal.build-load-data(load.pos())),
-    value: none,
+    plugin.transition(ctx.load, _internal.build-load-data(load.pos())),
+    none,
   )
 }
 
@@ -29,7 +29,7 @@
 ///   "1+1"
 /// )
 /// ```
-/// -> (ctx: <module>, value: any)
+/// -> (<module>, any)
 #let eval(
   /// the context in which this function should run
   /// -> <module>
@@ -57,7 +57,7 @@
 ///   "1+1"
 /// )
 /// ```
-/// -> (ctx: <module>, value: any)
+/// -> (<module>, any)
 #let eval-format(
   /// the context in which this function should run
   /// -> <module>
@@ -88,7 +88,7 @@
 ///   varname: "value"
 /// )
 /// ```
-/// -> (ctx: <module>, value: none)
+/// -> (<module>, none)
 #let define-vars(
   /// the context in which this function should run
   /// -> <module>
@@ -98,14 +98,14 @@
   ..vars,
 ) = {
   (
-    ctx: plugin.transition(ctx.define_vars, cbor.encode(vars.named())),
-    value: none,
+    plugin.transition(ctx.define_vars, cbor.encode(vars.named())),
+    none,
   )
 }
 
 /// Calls a js function by function name with an args.
 /// ```examplec
-/// let (ctx: current-context,) = ctxjs.ctx.eval(
+/// let (current-context,_) = ctxjs.ctx.eval(
 ///   current-context,
 ///   "function fnname() { return 1; }",
 ///   transition: true
@@ -116,7 +116,7 @@
 ///   varname: "value"
 /// )
 /// ```
-/// -> (ctx: <module>, value: any)
+/// -> (<module>, any)
 #let call-function(
   /// the context in which this function should run
   /// -> <module>
@@ -146,9 +146,9 @@
 /// <<<  current-context,
 /// <<<  read("bytecode.kbc1", encoding: none),
 /// <<<)
-/// >>> (ctx: current-context,value: none)
+/// >>> (current-context,none)
 /// ```
-/// -> (ctx: <module>, value: none)
+/// -> (<module>, none)
 #let load-module-bytecode(
   /// the context in which this function should run
   /// -> <module>
@@ -158,8 +158,8 @@
   bytecode,
 ) = {
   (
-    ctx: plugin.transition(ctx.load_module_bytecode, bytecode),
-    value: none,
+    plugin.transition(ctx.load_module_bytecode, bytecode),
+    none,
   )
 }
 
@@ -171,7 +171,7 @@
 ///   "export function test() {}",
 /// )
 /// ```
-/// -> (ctx: <module>, value: none)
+/// -> (<module>, none)
 #let load-module-js(
   /// the context in which this function should run
   /// -> <module>
@@ -184,18 +184,18 @@
   module,
 ) = {
   (
-    ctx: plugin.transition(
+    plugin.transition(
       ctx.load_module_js,
       bytes(modulename),
       bytes(module),
     ),
-    value: none,
+    none,
   )
 }
 
 /// Calls a js function in a module by function name with an args.
 /// ```examplec
-/// let (ctx: current-context,) =  ctxjs.ctx.load-module-js(
+/// let (current-context,_) =  ctxjs.ctx.load-module-js(
 ///   current-context,
 ///   "test_module",
 ///   "export function test() {return \"foo\";}",
@@ -207,7 +207,7 @@
 ///   varname: "value"
 /// )
 /// ```
-/// -> (ctx: <module>, value: any)
+/// -> (<module>, any)
 #let call-module-function(
   /// the context in which this function should run
   /// -> <module>
@@ -237,7 +237,7 @@
 
 /// Get all properties from a module.
 /// ```examplec
-/// let (ctx: current-context,) =  ctxjs.ctx.load-module-js(
+/// let (current-context,_) =  ctxjs.ctx.load-module-js(
 ///   current-context,
 ///   "test_module",
 ///   "export const key1 = 1;export const key2 = 1;",
@@ -247,7 +247,7 @@
 ///   "test_module",
 /// )
 /// ```
-/// -> (ctx: <module>, value: array)
+/// -> (<module>, array)
 #let get-module-properties(
   /// the context in which this function should run
   /// -> <module>
@@ -257,7 +257,7 @@
   modulename,
 ) = {
   (
-    ctx: ctx,
-    value: cbor(ctx.get_module_properties(bytes(modulename))),
+    ctx,
+    cbor(ctx.get_module_properties(bytes(modulename))),
   )
 }
