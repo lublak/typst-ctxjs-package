@@ -15,6 +15,10 @@ A typst plugin to evaluate javascript code.
 - allow loading json directly
 - convert images to data urls
 
+## Documentation
+
+A full documentation can be found here: [docs.pdf](https://raw.githubusercontent.com/lublak/typst-ctxjs-package/refs/heads/main/docs.pdf)
+
 ## An actively used package
 
 To get a picture what is possible with ctxjs there is a package based on echarts embedded into typst.
