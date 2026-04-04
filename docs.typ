@@ -101,7 +101,12 @@ It uses the modulename to compile the module code and write the bytecode to the 
       logo: read("example/Typst.svg.png", encoding: none),
     ),
   ),
-  layout: tidy.show-example.default-layout-example.with(scale-preview: 100%),
+  layout: (code, preview, ..options) => {
+    block(
+      breakable: false,
+      tidy.show-example.default-layout-example(code, preview, ..options),
+    )
+  },
 )
 
 === example files
@@ -136,12 +141,14 @@ It is recommend to build your own js file to an esm file and create bytecode fro
 Calls a javascript which takes a base64 image and returns a svg string embedding the base64 image.
 
 ```example
-<<<#image(bytes(
+<<<#let logo_svg = bytes(
 <<<  ctx.call-function(current-context, "create_svg", (value.image-data-url(read("examples/Typst.svg.png", encoding: none)))).at(1),
-<<<))
->>>#image(bytes(
+<<<)
+>>>>>>#let logo_svg = bytes(
 >>>  ctx.call-function(current-context, "create_svg", (value.image-data-url(data.logo))).at(1),
->>>))
+>>>)
+#image(logo_svg)
+#str(logo_svg).slice(0, 5)...#str(logo_svg).slice(100, 120)...#str(logo_svg).slice(145, 170)...
 ```
 === eval-format
 Evaluate js directly with formatting data.
