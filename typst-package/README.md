@@ -23,7 +23,7 @@ Creates a new context to work with and preloaded with a simple evaluated js file
 It is recommend to build your own js file to an esm file and create bytecode from it via ctxjs_module_bytecode_builder.
 
 ```typ
-#import "@preview/ctxjs:0.4.0"
+#import "@preview/ctxjs:0.4.1"
 #import ctxjs.load
 #import ctxjs.ctx
 #import ctxjs.value
@@ -50,7 +50,7 @@ value gets ignored
 
 ### Full documentation with guide
 
-A full documentation can be found here: [docs.pdf](https://raw.githubusercontent.com/lublak/typst-ctxjs-package/refs/tags/v0.4.0/docs.pdf)
+A full documentation can be found here: [docs.pdf](https://raw.githubusercontent.com/lublak/typst-ctxjs-package/refs/tags/v0.4.1/docs.pdf)
 
 ## An actively used package
 
