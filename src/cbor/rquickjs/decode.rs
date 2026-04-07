@@ -97,7 +97,6 @@ pub(crate) fn decode<'a, 'js>(
                     })?,
             ),
         },
-        #[cfg(feature = "half")]
         Type::F16 => Value::new_float(ctx.clone(), decoder.f16()?.into()),
         Type::F32 => Value::new_float(ctx.clone(), decoder.f32()?.into()),
         Type::F64 => Value::new_float(ctx.clone(), decoder.f64()?.into()),

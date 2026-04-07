@@ -31,9 +31,9 @@ pub fn get_typed_array_type<'js>(v: &rquickjs::Object<'js>) -> Option<TypedArray
         qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_UINT32 => Some(TypedArrayType::UInt32),
         qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_BIG_INT64 => Some(TypedArrayType::BigInt64),
         qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_BIG_UINT64 => Some(TypedArrayType::BigUint64),
-        //rquickjs::qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_FLOAT16 => Some(TypedArrayType::Float16),
-        rquickjs::qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_FLOAT32 => Some(TypedArrayType::Float32),
-        rquickjs::qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_FLOAT64 => Some(TypedArrayType::Float64),
+        //qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_FLOAT16 => Some(TypedArrayType::Float16),
+        qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_FLOAT32 => Some(TypedArrayType::Float32),
+        qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_FLOAT64 => Some(TypedArrayType::Float64),
         _ => None,
     }
 }

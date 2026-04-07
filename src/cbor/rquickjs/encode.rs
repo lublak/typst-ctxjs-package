@@ -105,6 +105,16 @@ fn encode_typed_array<'a, 'js, W: Write>(
         TypedArrayType::UInt32 => encode_rquickjs_typed_array!(encoder, u32, object),
         TypedArrayType::BigInt64 => encode_rquickjs_typed_array!(encoder, i64, object),
         TypedArrayType::BigUint64 => encode_rquickjs_typed_array!(encoder, u64, object),
+        //TypedArrayType::Float16 => {
+        //    let arr = object
+        //        .as_typed_array::<half::f16>()
+        //        .ok_or_else(|| rquickjs::Error::new_from_js(object.type_name(), "cbor"))?;
+        //    encoder.array(arr.len() as _)?;
+        //    for item in arr.as_ref() as &[half::f16] {
+        //        encoder.f16_half(*item)?;
+        //    }
+        //    Ok(encoder)
+        //}
         TypedArrayType::Float32 => encode_rquickjs_typed_array!(encoder, f32, object),
         TypedArrayType::Float64 => encode_rquickjs_typed_array!(encoder, f64, object),
     }

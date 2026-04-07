@@ -19,7 +19,6 @@ pub(crate) fn decode<'a, 'js>(decoder: &'a mut Decoder) -> Result<String, minicb
         Type::I32 => decoder.i32()?.to_string(),
         Type::I64 => decoder.i64()?.to_string(),
         Type::Int => decoder.int()?.to_string(),
-        #[cfg(feature = "half")]
         Type::F16 => decoder.f16()?.to_string(),
         Type::F32 => decoder.f32()?.to_string(),
         Type::F64 => decoder.f64()?.to_string(),
