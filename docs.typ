@@ -150,6 +150,31 @@ If you do not need the value, its safe to ignore it:
 value gets ignored
 ```
 
+=== use a context as a state
+
+Here a small example how to work with a state (just keep in mind that a state key needs to be unique something like this: `@preview/module-name:key`
+
+```example
+// store an array with a context and a "none" value
+#let global-context = state("@preview/ctxjs:context", (
+  ctxjs.new-context(),
+  none,
+))
+#global-context.update(current-state => {
+  let (current-context, _) = current-state
+  let (current-context, _) = ctx.eval(current-context, "let counter_0 = 0", transition: true)
+  // writes the (context, value) back to the state
+  return ctx.eval(current-context, "let counter_1 = 0", transition: true)
+})
+
+Value is:
+#context {
+  let (current-context, _) = global-context.get()
+  let (current-context, value) = ctx.eval(current-context, "counter_1")
+  value
+}
+```
+
 === image-data-url
 
 Calls a javascript which takes a base64 image and returns a svg string embedding the base64 image.
