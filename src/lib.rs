@@ -49,7 +49,7 @@ fn set_stored_value(val: Vec<u8>) {
 #[inline(always)]
 fn set_stored_value_from_rquickjs(store: bool, val: &rquickjs::Value) -> Result<Vec<u8>, String> {
     let val = cbor::rquickjs::encode_to_bytes(val)
-        .map_err(|e| format!("eval error: {}", e.to_string()))?;
+        .map_err(|e| format!("encode error: {}", e.to_string()))?;
     if store {
         set_stored_value(val.clone());
     }
@@ -336,6 +336,33 @@ fn get_module_properties(module_name: &[u8]) -> Result<Vec<u8>, String> {
         }
 
         Ok(encoder.into_writer())
+    })
+}
+
+#[wasm_func]
+fn get_module_property(module_name: &[u8], property_name: &[u8]) -> Result<Vec<u8>, String> {
+    let ctx = get_current_context()?;
+
+    let module_name: &str = std::str::from_utf8(module_name)
+        .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
+
+    let property_name: &str = std::str::from_utf8(property_name)
+        .map_err(|e| format!("failed to parse property_name: {}", e.to_string()))?;
+
+    ctx.with(|ctx| {
+        let m: rquickjs::Object = Module::import(&ctx, module_name)
+            .catch(&ctx)
+            .map_err(|e| format!("failed to import module: {}", e.to_string()))?
+            .finish()
+            .catch(&ctx)
+            .map_err(|e| format!("failed to finish module import: {}", e.to_string()))?;
+
+        let res = m
+            .get(property_name)
+            .map_err(|e| format!("failed to get module property: {}", e.to_string()))?;
+
+        cbor::rquickjs::encode_to_bytes(&res)
+            .map_err(|e| format!("encode error: {}", e.to_string()))
     })
 }
 

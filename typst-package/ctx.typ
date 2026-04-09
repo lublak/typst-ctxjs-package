@@ -261,3 +261,35 @@
     cbor(ctx.get_module_properties(bytes(modulename))),
   )
 }
+
+
+/// Get a property from a module.
+/// ```examplec
+/// let (current-context,_) =  ctxjs.ctx.load-module-js(
+///   current-context,
+///   "test_module",
+///   "export const key1 = 1;export const key2 = 1;",
+/// )
+/// ctxjs.ctx.get-module-property(
+///   current-context,
+///   "test_module",
+///   "key1",
+/// )
+/// ```
+/// -> (<module>, any)
+#let get-module-property(
+  /// the context in which this function should run
+  /// -> <module>
+  ctx,
+  /// the module name
+  /// -> str
+  modulename,
+  /// the property name
+  /// -> str
+  propertyname,
+) = {
+  (
+    ctx,
+    cbor(ctx.get_module_property(bytes(modulename), bytes(propertyname))),
+  )
+}
