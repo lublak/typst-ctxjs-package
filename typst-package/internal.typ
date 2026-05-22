@@ -63,9 +63,17 @@
   data
 }
 
-#let transition-call(ctx, fn, transition, ..args) = {
+#let encode-bool(b) = {
+  if b {
+    bytes((1,))
+  } else {
+    bytes((0,))
+  }
+}
+
+#let transition-call(ctx, fn, catch, transition, ..args) = {
   if transition {
-    ctx = plugin.transition(fn, ..args.pos(), bytes((1,)))
+    ctx = plugin.transition(fn, ..args.pos(), encode-bool(catch), encode-bool(true))
     return (
       ctx,
       cbor(ctx.stored_value()),
@@ -73,7 +81,7 @@
   } else {
     return (
       ctx,
-      cbor(fn(..args.pos(), bytes((0,)))),
+      cbor(fn(..args.pos(), encode-bool(catch), encode-bool(false))),
     )
   }
 }

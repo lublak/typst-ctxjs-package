@@ -56,6 +56,36 @@ fn set_stored_value_from_rquickjs(store: bool, val: &rquickjs::Value) -> Result<
     Ok(val)
 }
 
+#[inline(always)]
+fn catch_error<O>(catch: bool, store: bool, op: O) -> Result<Vec<u8>, String>
+where
+    O: FnOnce() -> Result<Vec<u8>, String>,
+{
+    if catch {
+        op().or_else(|err| {
+            let mut encoder = Encoder::new(Vec::new());
+            encoder
+                .map(1)
+                .map_err(|e| format!("failed to serialize error: {}", e.to_string()))?;
+            encoder
+                .str("error")
+                .map_err(|e| format!("failed to serialize error: {}", e.to_string()))?;
+            encoder
+                .str(&err)
+                .map_err(|e| format!("failed to serialize error: {}", e.to_string()))?;
+            Ok(encoder.into_writer())
+        })
+        .map(|res| {
+            if store {
+                set_stored_value(res.clone());
+            }
+            res
+        })
+    } else {
+        op()
+    }
+}
+
 #[wasm_func]
 fn new_context(load: &[u8]) -> Result<Vec<u8>, String> {
     let runtime =
@@ -78,182 +108,184 @@ fn stored_value() -> Result<Vec<u8>, String> {
 }
 
 #[wasm_func]
-fn load(run: &[u8]) -> Result<Vec<u8>, String> {
-    let ctx = get_current_context()?;
+fn load(run: &[u8], catch: &[u8]) -> Result<Vec<u8>, String> {
+    let catch = !catch.is_empty() && catch[0] > 0;
 
-    cbor_decode_run_load(&mut Decoder::new(run), &ctx)
-        .map_err(|e| format!("failed to run load: {}", e.to_string()))?;
+    catch_error(catch, true, || {
+        let ctx = get_current_context()?;
 
-    Ok(vec![])
+        cbor_decode_run_load(&mut Decoder::new(run), &ctx)
+            .map_err(|e| format!("failed to run load: {}", e.to_string()))
+            .map(|_| vec![])
+    })
 }
 
 #[wasm_func]
-fn eval(js: &[u8], store: &[u8]) -> Result<Vec<u8>, String> {
-    let ctx = get_current_context()?;
-
-    let js =
-        std::str::from_utf8(js).map_err(|e| format!("failed to parse js: {}", e.to_string()))?;
-
+fn eval(js: &[u8], catch: &[u8], store: &[u8]) -> Result<Vec<u8>, String> {
+    let catch = !catch.is_empty() && catch[0] > 0;
     let store = !store.is_empty() && store[0] > 0;
 
-    let mut options = EvalOptions::default();
-    options.global = true;
+    catch_error(catch, store, || {
+        let ctx = get_current_context()?;
 
-    ctx.with(|ctx| {
-        let value = &ctx
-            .eval_with_options(js, options)
-            .catch(&ctx)
-            .map_err(|e| format!("eval error: {}", e.to_string()))?;
-        set_stored_value_from_rquickjs(store, &value)
+        let js = std::str::from_utf8(js)
+            .map_err(|e| format!("failed to parse js: {}", e.to_string()))?;
+
+        let mut options = EvalOptions::default();
+        options.global = true;
+
+        ctx.with(|ctx| {
+            let value = &ctx
+                .eval_with_options(js, options)
+                .catch(&ctx)
+                .map_err(|e| format!("eval error: {}", e.to_string()))?;
+            set_stored_value_from_rquickjs(store, &value)
+        })
     })
 }
 
 #[wasm_func]
-fn eval_format(js: &[u8], arguments: &[u8], store: &[u8]) -> Result<Vec<u8>, String> {
-    let ctx = get_current_context()?;
-
-    let mut decoder = Decoder::new(arguments);
-
-    let arguments = cbor::rquickjs::args::string_map(&mut decoder)
-        .map_err(|e| format!("failed to deserialize arguments: {}", e.to_string()))?;
-
+fn eval_format(js: &[u8], arguments: &[u8], catch: &[u8], store: &[u8]) -> Result<Vec<u8>, String> {
+    let catch = !catch.is_empty() && catch[0] > 0;
     let store = !store.is_empty() && store[0] > 0;
 
-    let mut options = EvalOptions::default();
-    options.global = true;
+    catch_error(catch, store, || {
+        let ctx = get_current_context()?;
 
-    ctx.with(|ctx| {
-        let value = ctx
-            .eval_with_options(
-                strfmt::strfmt(js, &arguments)
-                    .map_err(|e| format!("can not format js string: {}", e))?,
-                options,
-            )
-            .catch(&ctx)
-            .map_err(|e| format!("eval error: {}", e.to_string()))?;
-        set_stored_value_from_rquickjs(store, &value)
+        let mut decoder = Decoder::new(arguments);
+
+        let arguments = cbor::rquickjs::args::string_map(&mut decoder)
+            .map_err(|e| format!("failed to deserialize arguments: {}", e.to_string()))?;
+
+        let mut options = EvalOptions::default();
+        options.global = true;
+
+        ctx.with(|ctx| {
+            let value = ctx
+                .eval_with_options(
+                    strfmt::strfmt(js, &arguments)
+                        .map_err(|e| format!("can not format js string: {}", e))?,
+                    options,
+                )
+                .catch(&ctx)
+                .map_err(|e| format!("eval error: {}", e.to_string()))?;
+            set_stored_value_from_rquickjs(store, &value)
+        })
     })
 }
 
 #[wasm_func]
-fn define_vars(variables: &[u8]) -> Result<Vec<u8>, String> {
-    let ctx = get_current_context()?;
+fn define_vars(variables: &[u8], catch: &[u8]) -> Result<Vec<u8>, String> {
+    let catch = !catch.is_empty() && catch[0] > 0;
 
-    let mut decoder = Decoder::new(variables);
+    catch_error(catch, true, || {
+        let ctx = get_current_context()?;
 
-    let variables = cbor::rquickjs::args::string_map(&mut decoder)
-        .map_err(|e| format!("failed to deserialize variables: {}", e.to_string()))?;
+        let mut decoder = Decoder::new(variables);
 
-    let variables: String = variables
-        .into_iter()
-        .map(|(k, v)| format!("let {}={}", k, v))
-        .fold(String::new(), |a, b| a + &b + ";");
+        let variables = cbor::rquickjs::args::string_map(&mut decoder)
+            .map_err(|e| format!("failed to deserialize variables: {}", e.to_string()))?;
 
-    ctx.with(|ctx| {
-        _ = ctx
-            .eval::<rquickjs::Value, std::string::String>(format!("{};", variables))
-            .catch(&ctx)
-            .map_err(|e| format!("eval error: {}", e.to_string()))?;
+        let variables: String = variables
+            .into_iter()
+            .map(|(k, v)| format!("let {}={}", k, v))
+            .fold(String::new(), |a, b| a + &b + ";");
 
-        Ok(vec![])
+        ctx.with(|ctx| {
+            _ = ctx
+                .eval::<rquickjs::Value, std::string::String>(format!("{};", variables))
+                .catch(&ctx)
+                .map_err(|e| format!("eval error: {}", e.to_string()))?;
+
+            Ok(vec![])
+        })
     })
 }
 
 #[wasm_func]
-fn call_function(fn_name: &[u8], arguments: &[u8], store: &[u8]) -> Result<Vec<u8>, String> {
-    let ctx = get_current_context()?;
-
-    let fn_name: &str = std::str::from_utf8(fn_name)
-        .map_err(|e| format!("failed to parse fn_name: {}", e.to_string()))?;
-
+fn call_function(
+    fn_name: &[u8],
+    arguments: &[u8],
+    catch: &[u8],
+    store: &[u8],
+) -> Result<Vec<u8>, String> {
+    let catch = !catch.is_empty() && catch[0] > 0;
     let store = store.len() > 0 && store[0] > 0;
 
-    ctx.with(|ctx| {
-        let arguments: Vec<rquickjs::Value> =
-            cbor::rquickjs::args::array(&ctx, &mut Decoder::new(arguments))
-                .map_err(|e| format!("failed to deserialize arguments: {}", e.to_string()))?;
+    catch_error(catch, store, || {
+        let ctx = get_current_context()?;
 
-        let mut args = Args::new(ctx.clone(), arguments.len());
-        args.push_args(arguments)
-            .map_err(|e| format!("failed to add args: {}", e.to_string()))?;
+        let fn_name: &str = std::str::from_utf8(fn_name)
+            .map_err(|e| format!("failed to parse fn_name: {}", e.to_string()))?;
 
-        let func: rquickjs::Function = ctx
-            .globals()
-            .get(fn_name)
-            .catch(&ctx)
-            .map_err(|e| format!("failed to get function: {}", e.to_string()))?;
+        ctx.with(|ctx| {
+            let arguments: Vec<rquickjs::Value> =
+                cbor::rquickjs::args::array(&ctx, &mut Decoder::new(arguments))
+                    .map_err(|e| format!("failed to deserialize arguments: {}", e.to_string()))?;
 
-        let res = func
-            .call_arg(args)
-            .catch(&ctx)
-            .map_err(|e| format!("failed to call function: {}", e.to_string()))?;
+            let mut args = Args::new(ctx.clone(), arguments.len());
+            args.push_args(arguments)
+                .map_err(|e| format!("failed to add args: {}", e.to_string()))?;
 
-        set_stored_value_from_rquickjs(store, &res)
-    })
-}
+            let func: rquickjs::Function = ctx
+                .globals()
+                .get(fn_name)
+                .catch(&ctx)
+                .map_err(|e| format!("failed to get function: {}", e.to_string()))?;
 
-//#[wasm_func]
-//fn compile_module_bytecode(module_name: &[u8], module: &[u8]) -> Result<Vec<u8>, String> {
-//    let ctx = get_current_context()?;
-//
-//    let module_name: &str = std::str::from_utf8(module_name)
-//        .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
-//
-//    let module: &str = std::str::from_utf8(module)
-//        .map_err(|e| format!("failed to parse module: {}", e.to_string()))?;
-//
-//    ctx.with(|ctx| {
-//        let m = Module::declare(ctx, module_name, module)
-//            .map_err(|e| format!("failed declare module: {}", e.to_string()))?;
-//        let byte_code = m
-//            .write(WriteOptions {
-//                endianness: WriteOptionsEndianness::Native,
-//                allow_shared_array_buffer: false,
-//                object_reference: false,
-//                strip_source: true,
-//                strip_debug: true,
-//            })
-//            .map_err(|e| format!("failed to get bytecode: {}", e.to_string()))?;
-//
-//        Ok(byte_code)
-//    })
-//}
+            let res = func
+                .call_arg(args)
+                .catch(&ctx)
+                .map_err(|e| format!("failed to call function: {}", e.to_string()))?;
 
-#[wasm_func]
-fn load_module_bytecode(bytecode: &[u8]) -> Result<Vec<u8>, String> {
-    let ctx = get_current_context()?;
-
-    ctx.with(|ctx| {
-        let m = unsafe { Module::load(ctx.clone(), bytecode) }
-            .catch(&ctx)
-            .map_err(|e| format!("failed load bytecode: {}", e.to_string()))?;
-        _ = m
-            .eval()
-            .catch(&ctx)
-            .map_err(|e| format!("failed eval bytecode: {}", e.to_string()))?;
-
-        Ok(vec![])
+            set_stored_value_from_rquickjs(store, &res)
+        })
     })
 }
 
 #[wasm_func]
-fn load_module_js(module_name: &[u8], module: &[u8]) -> Result<Vec<u8>, String> {
-    let ctx = get_current_context()?;
+fn load_module_bytecode(bytecode: &[u8], catch: &[u8]) -> Result<Vec<u8>, String> {
+    let catch = !catch.is_empty() && catch[0] > 0;
 
-    let module_name: &str = std::str::from_utf8(module_name)
-        .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
+    catch_error(catch, true, || {
+        let ctx = get_current_context()?;
 
-    let module: &str = std::str::from_utf8(module)
-        .map_err(|e| format!("failed to parse module: {}", e.to_string()))?;
+        ctx.with(|ctx| {
+            let m = unsafe { Module::load(ctx.clone(), bytecode) }
+                .catch(&ctx)
+                .map_err(|e| format!("failed load bytecode: {}", e.to_string()))?;
+            _ = m
+                .eval()
+                .catch(&ctx)
+                .map_err(|e| format!("failed eval bytecode: {}", e.to_string()))?;
 
-    ctx.with(|ctx| {
-        _ = Module::declare(ctx.clone(), module_name, module)
-            .catch(&ctx)
-            .map_err(|e| format!("failed load module code: {}", e.to_string()))?
-            .eval()
-            .catch(&ctx)
-            .map_err(|e| format!("failed eval module code: {}", e.to_string()))?;
-        Ok(vec![])
+            Ok(vec![])
+        })
+    })
+}
+
+#[wasm_func]
+fn load_module_js(module_name: &[u8], module: &[u8], catch: &[u8]) -> Result<Vec<u8>, String> {
+    let catch = !catch.is_empty() && catch[0] > 0;
+
+    catch_error(catch, true, || {
+        let ctx = get_current_context()?;
+
+        let module_name: &str = std::str::from_utf8(module_name)
+            .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
+
+        let module: &str = std::str::from_utf8(module)
+            .map_err(|e| format!("failed to parse module: {}", e.to_string()))?;
+
+        ctx.with(|ctx| {
+            _ = Module::declare(ctx.clone(), module_name, module)
+                .catch(&ctx)
+                .map_err(|e| format!("failed load module code: {}", e.to_string()))?
+                .eval()
+                .catch(&ctx)
+                .map_err(|e| format!("failed eval module code: {}", e.to_string()))?;
+            Ok(vec![])
+        })
     })
 }
 
@@ -262,107 +294,122 @@ fn call_module_function(
     module_name: &[u8],
     fn_name: &[u8],
     arguments: &[u8],
-
+    catch: &[u8],
     store: &[u8],
 ) -> Result<Vec<u8>, String> {
-    let ctx = get_current_context()?;
-
-    let module_name: &str = std::str::from_utf8(module_name)
-        .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
-
-    let fn_name: &str = std::str::from_utf8(fn_name)
-        .map_err(|e| format!("failed to parse fn_name: {}", e.to_string()))?;
-
+    let catch = !catch.is_empty() && catch[0] > 0;
     let store = store.len() > 0 && store[0] > 0;
 
-    ctx.with(|ctx| {
-        let arguments: Vec<rquickjs::Value> =
-            cbor::rquickjs::args::array(&ctx, &mut Decoder::new(arguments))
-                .map_err(|e| format!("failed to deserialize arguments: {}", e.to_string()))?;
+    catch_error(catch, store, || {
+        let ctx = get_current_context()?;
 
-        let mut args = Args::new(ctx.clone(), arguments.len());
-        args.push_args(arguments)
-            .map_err(|e| format!("failed to add args: {}", e.to_string()))?;
+        let module_name: &str = std::str::from_utf8(module_name)
+            .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
 
-        let m: rquickjs::Object = Module::import(&ctx, module_name)
-            .catch(&ctx)
-            .map_err(|e| format!("failed to import module: {}", e.to_string()))?
-            .finish()
-            .catch(&ctx)
-            .map_err(|e| format!("failed to finish module import: {}", e.to_string()))?;
+        let fn_name: &str = std::str::from_utf8(fn_name)
+            .map_err(|e| format!("failed to parse fn_name: {}", e.to_string()))?;
 
-        let func: rquickjs::Function = m
-            .get(fn_name)
-            .catch(&ctx)
-            .map_err(|e| format!("failed to get function: {}", e.to_string()))?;
+        ctx.with(|ctx| {
+            let arguments: Vec<rquickjs::Value> =
+                cbor::rquickjs::args::array(&ctx, &mut Decoder::new(arguments))
+                    .map_err(|e| format!("failed to deserialize arguments: {}", e.to_string()))?;
 
-        let res = func
-            .call_arg(args)
-            .catch(&ctx)
-            .map_err(|e| format!("failed to call function: {}", e.to_string()))?;
+            let mut args = Args::new(ctx.clone(), arguments.len());
+            args.push_args(arguments)
+                .map_err(|e| format!("failed to add args: {}", e.to_string()))?;
 
-        set_stored_value_from_rquickjs(store, &res)
-    })
-}
-
-#[wasm_func]
-fn get_module_properties(module_name: &[u8]) -> Result<Vec<u8>, String> {
-    let ctx = get_current_context()?;
-
-    let module_name: &str = std::str::from_utf8(module_name)
-        .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
-
-    ctx.with(|ctx| {
-        let m: rquickjs::Object = Module::import(&ctx, module_name)
-            .catch(&ctx)
-            .map_err(|e| format!("failed to import module: {}", e.to_string()))?
-            .finish()
-            .catch(&ctx)
-            .map_err(|e| format!("failed to finish module import: {}", e.to_string()))?;
-
-        let mut encoder = Encoder::new(Vec::new());
-        let keys = m.keys();
-        encoder
-            .array(keys.len() as _)
-            .map_err(|e| format!("failed to serialize results: {}", e.to_string()))?;
-        for key in keys {
-            let key: String = key
+            let m: rquickjs::Object = Module::import(&ctx, module_name)
                 .catch(&ctx)
-                .map_err(|e| format!("can not collect module keys: {}", e.to_string()))?;
+                .map_err(|e| format!("failed to import module: {}", e.to_string()))?
+                .finish()
+                .catch(&ctx)
+                .map_err(|e| format!("failed to finish module import: {}", e.to_string()))?;
 
-            encoder
-                .str(&key)
-                .map_err(|e| format!("failed to serialize results: {}", e.to_string()))?;
-        }
+            let func: rquickjs::Function = m
+                .get(fn_name)
+                .catch(&ctx)
+                .map_err(|e| format!("failed to get function: {}", e.to_string()))?;
 
-        Ok(encoder.into_writer())
+            let res = func
+                .call_arg(args)
+                .catch(&ctx)
+                .map_err(|e| format!("failed to call function: {}", e.to_string()))?;
+
+            set_stored_value_from_rquickjs(store, &res)
+        })
     })
 }
 
 #[wasm_func]
-fn get_module_property(module_name: &[u8], property_name: &[u8]) -> Result<Vec<u8>, String> {
-    let ctx = get_current_context()?;
+fn get_module_properties(module_name: &[u8], catch: &[u8]) -> Result<Vec<u8>, String> {
+    let catch = !catch.is_empty() && catch[0] > 0;
 
-    let module_name: &str = std::str::from_utf8(module_name)
-        .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
+    catch_error(catch, false, || {
+        let ctx = get_current_context()?;
 
-    let property_name: &str = std::str::from_utf8(property_name)
-        .map_err(|e| format!("failed to parse property_name: {}", e.to_string()))?;
+        let module_name: &str = std::str::from_utf8(module_name)
+            .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
 
-    ctx.with(|ctx| {
-        let m: rquickjs::Object = Module::import(&ctx, module_name)
-            .catch(&ctx)
-            .map_err(|e| format!("failed to import module: {}", e.to_string()))?
-            .finish()
-            .catch(&ctx)
-            .map_err(|e| format!("failed to finish module import: {}", e.to_string()))?;
+        ctx.with(|ctx| {
+            let m: rquickjs::Object = Module::import(&ctx, module_name)
+                .catch(&ctx)
+                .map_err(|e| format!("failed to import module: {}", e.to_string()))?
+                .finish()
+                .catch(&ctx)
+                .map_err(|e| format!("failed to finish module import: {}", e.to_string()))?;
 
-        let res = m
-            .get(property_name)
-            .map_err(|e| format!("failed to get module property: {}", e.to_string()))?;
+            let mut encoder = Encoder::new(Vec::new());
+            let keys = m.keys();
+            encoder
+                .array(keys.len() as _)
+                .map_err(|e| format!("failed to serialize results: {}", e.to_string()))?;
+            for key in keys {
+                let key: String = key
+                    .catch(&ctx)
+                    .map_err(|e| format!("can not collect module keys: {}", e.to_string()))?;
 
-        cbor::rquickjs::encode_to_bytes(&res)
-            .map_err(|e| format!("encode error: {}", e.to_string()))
+                encoder
+                    .str(&key)
+                    .map_err(|e| format!("failed to serialize results: {}", e.to_string()))?;
+            }
+
+            Ok(encoder.into_writer())
+        })
+    })
+}
+
+#[wasm_func]
+fn get_module_property(
+    module_name: &[u8],
+    property_name: &[u8],
+    catch: &[u8],
+) -> Result<Vec<u8>, String> {
+    let catch = !catch.is_empty() && catch[0] > 0;
+
+    catch_error(catch, false, || {
+        let ctx = get_current_context()?;
+
+        let module_name: &str = std::str::from_utf8(module_name)
+            .map_err(|e| format!("failed to parse module_name: {}", e.to_string()))?;
+
+        let property_name: &str = std::str::from_utf8(property_name)
+            .map_err(|e| format!("failed to parse property_name: {}", e.to_string()))?;
+
+        ctx.with(|ctx| {
+            let m: rquickjs::Object = Module::import(&ctx, module_name)
+                .catch(&ctx)
+                .map_err(|e| format!("failed to import module: {}", e.to_string()))?
+                .finish()
+                .catch(&ctx)
+                .map_err(|e| format!("failed to finish module import: {}", e.to_string()))?;
+
+            let res = m
+                .get(property_name)
+                .map_err(|e| format!("failed to get module property: {}", e.to_string()))?;
+
+            cbor::rquickjs::encode_to_bytes(&res)
+                .map_err(|e| format!("encode error: {}", e.to_string()))
+        })
     })
 }
 

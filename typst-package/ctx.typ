@@ -15,10 +15,13 @@
   /// load bytes `created by ctxjs.load.*`
   /// -> bytes
   ..load,
+  /// if all errors should be catched and return as an dictionary(err:str)
+  /// -> bool
+  catch: false,
 ) = {
   (
-    plugin.transition(ctx.load, _internal.build-load-data(load.pos())),
-    none,
+    plugin.transition(ctx.load, _internal.build-load-data(load.pos()), _internal.encode-bool(catch)),
+    cbor(ctx.stored_value()),
   )
 }
 
@@ -40,10 +43,14 @@
   /// if a new context should be created (with changed data)
   /// -> bool
   transition: false,
+  /// if all errors should be catched and return as an dictionary(err:str)
+  /// -> bool
+  catch: false,
 ) = {
   _internal.transition-call(
     ctx,
     ctx.eval,
+    catch,
     transition,
     bytes(js),
   )
@@ -71,10 +78,14 @@
   /// if a new context should be created (with changed data)
   /// -> bool
   transition: false,
+  /// if all errors should be catched and return as an dictionary(err:str)
+  /// -> bool
+  catch: false,
 ) = {
   _internal.transition-call(
     ctx,
     ctx.eval_format,
+    catch,
     transition,
     bytes(js),
     cbor.encode(args.named()),
@@ -96,10 +107,13 @@
   /// the context in which this function should run
   /// -> any
   ..vars,
+  /// if all errors should be catched and return as an dictionary(err:str)
+  /// -> bool
+  catch: false,
 ) = {
   (
-    plugin.transition(ctx.define_vars, cbor.encode(vars.named())),
-    none,
+    plugin.transition(ctx.define_vars, cbor.encode(vars.named()), _internal.encode-bool(catch)),
+    cbor(ctx.stored_value()),
   )
 }
 
@@ -130,10 +144,14 @@
   /// if a new context should be created (with changed data)
   /// -> bool
   transition: false,
+  /// if all errors should be catched and return as an dictionary(err:str)
+  /// -> bool
+  catch: false,
 ) = {
   _internal.transition-call(
     ctx,
     ctx.call_function,
+    catch,
     transition,
     bytes(fnname),
     cbor.encode(args.pos()),
@@ -156,10 +174,13 @@
   /// the bytecode mostly created by the @ctxjs_module_bytecode_builder
   /// -> bytes
   bytecode,
+  /// if all errors should be catched and return as an dictionary(err:str)
+  /// -> bool
+  catch: false,
 ) = {
   (
-    plugin.transition(ctx.load_module_bytecode, bytecode),
-    none,
+    plugin.transition(ctx.load_module_bytecode, bytecode, _internal.encode-bool(catch)),
+    cbor(ctx.stored_value()),
   )
 }
 
@@ -182,14 +203,18 @@
   /// the js module code
   /// -> str | bytes
   module,
+  /// if all errors should be catched and return as an dictionary(err:str)
+  /// -> bool
+  catch: false,
 ) = {
   (
     plugin.transition(
       ctx.load_module_js,
       bytes(modulename),
       bytes(module),
+      _internal.encode-bool(catch),
     ),
-    none,
+    cbor(ctx.stored_value()),
   )
 }
 
@@ -224,10 +249,14 @@
   /// if a new context should be created (with changed data)
   /// -> bool
   transition: false,
+  /// if all errors should be catched and return as an dictionary(err:str)
+  /// -> bool
+  catch: false,
 ) = {
   _internal.transition-call(
     ctx,
     ctx.call_module_function,
+    catch,
     transition,
     bytes(modulename),
     bytes(fnname),
@@ -255,10 +284,13 @@
   /// the module name
   /// -> str
   modulename,
+  /// if all errors should be catched and return as an dictionary(err:str)
+  /// -> bool
+  catch: false,
 ) = {
   (
     ctx,
-    cbor(ctx.get_module_properties(bytes(modulename))),
+    cbor(ctx.get_module_properties(bytes(modulename), _internal.encode-bool(catch))),
   )
 }
 
@@ -287,9 +319,12 @@
   /// the property name
   /// -> str
   propertyname,
+  /// if all errors should be catched and return as an dictionary(err:str)
+  /// -> bool
+  catch: false,
 ) = {
   (
     ctx,
-    cbor(ctx.get_module_property(bytes(modulename), bytes(propertyname))),
+    cbor(ctx.get_module_property(bytes(modulename), bytes(propertyname), _internal.encode-bool(catch))),
   )
 }
