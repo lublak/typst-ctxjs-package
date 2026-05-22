@@ -34,7 +34,7 @@ fn get_stored_value() -> Vec<u8> {
         if let Some(value) = &CURRENT_VALUE {
             value.clone()
         } else {
-            vec![]
+            cbor_none()
         }
     };
 }
@@ -86,6 +86,11 @@ where
     }
 }
 
+#[inline(always)]
+fn cbor_none() -> Vec<u8> {
+    vec![0xE0 | 22]
+}
+
 #[wasm_func]
 fn new_context(load: &[u8]) -> Result<Vec<u8>, String> {
     let runtime =
@@ -99,7 +104,7 @@ fn new_context(load: &[u8]) -> Result<Vec<u8>, String> {
 
     set_current_context(ctx);
 
-    Ok(vec![])
+    Ok(cbor_none())
 }
 
 #[wasm_func]
@@ -116,7 +121,7 @@ fn load(run: &[u8], catch: &[u8]) -> Result<Vec<u8>, String> {
 
         cbor_decode_run_load(&mut Decoder::new(run), &ctx)
             .map_err(|e| format!("failed to run load: {}", e.to_string()))
-            .map(|_| vec![])
+            .map(|_| cbor_none())
     })
 }
 
@@ -197,7 +202,7 @@ fn define_vars(variables: &[u8], catch: &[u8]) -> Result<Vec<u8>, String> {
                 .catch(&ctx)
                 .map_err(|e| format!("eval error: {}", e.to_string()))?;
 
-            Ok(vec![])
+            Ok(cbor_none())
         })
     })
 }
@@ -259,7 +264,7 @@ fn load_module_bytecode(bytecode: &[u8], catch: &[u8]) -> Result<Vec<u8>, String
                 .catch(&ctx)
                 .map_err(|e| format!("failed eval bytecode: {}", e.to_string()))?;
 
-            Ok(vec![])
+            Ok(cbor_none())
         })
     })
 }
@@ -284,7 +289,7 @@ fn load_module_js(module_name: &[u8], module: &[u8], catch: &[u8]) -> Result<Vec
                 .eval()
                 .catch(&ctx)
                 .map_err(|e| format!("failed eval module code: {}", e.to_string()))?;
-            Ok(vec![])
+            Ok(cbor_none())
         })
     })
 }
