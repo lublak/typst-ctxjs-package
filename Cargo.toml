@@ -14,7 +14,7 @@ name = "ctxjs_module_bytecode_builder"
 path = "src/bin/ctxjs_module_bytecode_builder/main.rs"
 
 [dependencies]
-rquickjs = { version = "0.11.0", features = ["full-wasi"] }
+rquickjs = { version = "0.12.0", features = ["full-wasi"] }
 wasm-minimal-protocol = { git = "https://github.com/typst-community/wasm-minimal-protocol" }
 base64 = "0.22.1"
 infer = { version = "0.19.0", default-features = false }
@@ -22,4 +22,4 @@ minicbor = { git = "https://github.com/lublak/minicbor", branch = "raw_half", fe
     "std",
     "half",
 ] }
-half = { version = "2.7.1", optional = true }
+half = "2.7.1"
