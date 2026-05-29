@@ -5,7 +5,9 @@ use crate::{
     strfmt,
 };
 
-pub(crate) fn decode<'a, 'js>(decoder: &'a mut Decoder) -> Result<String, minicbor::decode::Error> {
+pub(crate) fn decode<'a, 'js>(
+    decoder: &'a mut Decoder,
+) -> cbor::rquickjs::decode::Result<'js, String> {
     return Ok(match decoder.datatype()? {
         Type::Bool => if decoder.bool()? { "true" } else { "false" }.to_string(),
         Type::Null => "null".to_string(),
@@ -116,12 +118,14 @@ pub(crate) fn decode<'a, 'js>(decoder: &'a mut Decoder) -> Result<String, minicb
             }
             t => {
                 return Err(minicbor::decode::Error::tag_mismatch(t)
-                    .with_message(format!("unsupported tagged data {}", t)))
+                    .with_message(format!("unsupported tagged data {}", t))
+                    .into())
             }
         },
         other => {
             return Err(minicbor::decode::Error::type_mismatch(other)
-                .with_message("unknown or unsupported type"))
+                .with_message("unknown or unsupported type")
+                .into())
         }
     });
 }

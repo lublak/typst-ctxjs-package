@@ -11,7 +11,7 @@ pub enum TypedArrayType {
     UInt32,
     BigInt64,
     BigUint64,
-    //Float16,
+    Float16,
     Float32,
     Float64,
 }
@@ -31,7 +31,7 @@ pub fn get_typed_array_type<'js>(v: &rquickjs::Object<'js>) -> Option<TypedArray
         qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_UINT32 => Some(TypedArrayType::UInt32),
         qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_BIG_INT64 => Some(TypedArrayType::BigInt64),
         qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_BIG_UINT64 => Some(TypedArrayType::BigUint64),
-        //qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_FLOAT16 => Some(TypedArrayType::Float16),
+        qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_FLOAT16 => Some(TypedArrayType::Float16),
         qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_FLOAT32 => Some(TypedArrayType::Float32),
         qjs::JSTypedArrayEnum_JS_TYPED_ARRAY_FLOAT64 => Some(TypedArrayType::Float64),
         _ => None,

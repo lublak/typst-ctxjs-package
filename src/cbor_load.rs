@@ -1,7 +1,6 @@
 use minicbor::Decoder;
-use rquickjs::{
-    context::EvalOptions, function::Args, CatchResultExt, CaughtError, Context, Module,
-};
+use rquickjs::Ctx;
+use rquickjs::{context::EvalOptions, function::Args, CatchResultExt, CaughtError, Module};
 
 use crate::cbor;
 use crate::strfmt;
@@ -14,27 +13,24 @@ const LOAD_LOAD_MODULE_BYTECODE: u8 = 4;
 const LOAD_LOAD_MODULE_JS: u8 = 5;
 const LOAD_CALL_MODULE_FUNCTION: u8 = 6;
 
-fn run_load_eval(js: &[u8], ctx: &Context) -> Result<(), minicbor::decode::Error> {
-    let js: &str = std::str::from_utf8(js).map_err(|err| minicbor::decode::Error::custom(err))?;
+fn cbor_decode_run_load_eval<'js>(
+    decoder: &mut Decoder,
+    ctx: &Ctx<'js>,
+) -> cbor::rquickjs::decode::Result<'js, ()> {
+    let js = decoder.bytes()?;
 
     let mut options = EvalOptions::default();
     options.global = true;
 
-    _ = ctx.with(|ctx| -> Result<(), minicbor::decode::Error> {
-        ctx.eval_with_options(js, options)
-            .catch(&ctx)
-            .map_err(|err: CaughtError| {
-                minicbor::decode::Error::message(format!("eval error: {}", err))
-            })
-    })?;
+    let _: rquickjs::Value = ctx.eval_with_options(js, options).catch(&ctx)?;
 
     Ok(())
 }
 
-fn cbor_decode_run_load_eval_format(
+fn cbor_decode_run_load_eval_format<'js>(
     decoder: &mut Decoder,
-    ctx: &Context,
-) -> Result<(), minicbor::decode::Error> {
+    ctx: &Ctx<'js>,
+) -> cbor::rquickjs::decode::Result<'js, ()> {
     cbor::utils::array_fixed_length(decoder, 2)?;
 
     let js = decoder.bytes()?;
@@ -43,187 +39,151 @@ fn cbor_decode_run_load_eval_format(
     let mut options = EvalOptions::default();
     options.global = true;
 
-    _ = ctx.with(|ctx| -> Result<(), minicbor::decode::Error> {
-        ctx.eval_with_options(
+    let _: rquickjs::Value = ctx
+        .eval_with_options(
             strfmt::strfmt(&js, &arguments).map_err(|err| {
                 minicbor::decode::Error::message(format!("can not format js string: {}", err))
             })?,
             options,
         )
-        .catch(&ctx)
-        .map_err(|err: CaughtError| minicbor::decode::Error::message(err))
-    })?;
+        .catch(&ctx)?;
+
     Ok(())
 }
 
-fn cbor_decode_run_load_define_vars(
+fn cbor_decode_run_load_define_vars<'js>(
     decoder: &mut Decoder,
-    ctx: &Context,
-) -> Result<(), minicbor::decode::Error> {
+    ctx: &Ctx<'js>,
+) -> cbor::rquickjs::decode::Result<'js, ()> {
     let variables = cbor::rquickjs::args::string_map(decoder)?
         .into_iter()
         .map(|(k, v)| format!("let {}={}", k, v))
         .fold(String::new(), |a, b| a + &b + ";");
 
-    _ = ctx.with(|ctx| -> Result<(), minicbor::decode::Error> {
+    let _: rquickjs::Value =
         ctx.eval(format!("{};", variables))
             .catch(&ctx)
             .map_err(|err: CaughtError| {
                 minicbor::decode::Error::message(format!("eval error: {}", err.to_string()))
-            })
-    })?;
+            })?;
     Ok(())
 }
 
-fn cbor_decode_run_call_function(
+fn cbor_decode_run_call_function<'js>(
     decoder: &mut Decoder,
-    ctx: &Context,
-) -> Result<(), minicbor::decode::Error> {
+    ctx: &Ctx<'js>,
+) -> cbor::rquickjs::decode::Result<'js, ()> {
     cbor::utils::array_fixed_length(decoder, 2)?;
 
     let fn_name = decoder.str()?;
 
-    _ = ctx.with(|ctx| -> Result<(), minicbor::decode::Error> {
-        let arguments: Vec<rquickjs::Value> =
-            cbor::rquickjs::args::array(&ctx, decoder).map_err(|e| {
-                minicbor::decode::Error::message(format!(
-                    "failed to deserialize arguments: {}",
-                    e.to_string()
-                ))
-            })?;
-
-        let mut args = Args::new(ctx.clone(), arguments.len());
-        args.push_args(arguments).map_err(|e| {
-            minicbor::decode::Error::message(format!("failed to add args: {}", e.to_string()))
+    let arguments: Vec<rquickjs::Value> =
+        cbor::rquickjs::args::array(&ctx, decoder).map_err(|e| {
+            minicbor::decode::Error::message(format!(
+                "failed to deserialize arguments: {}",
+                e.to_string()
+            ))
         })?;
 
-        let func: rquickjs::Function = ctx.globals().get(fn_name).catch(&ctx).map_err(|e| {
-            minicbor::decode::Error::message(format!("failed to get function: {}", e.to_string()))
-        })?;
+    let mut args = Args::new(ctx.clone(), arguments.len());
+    args.push_args(arguments).map_err(|e| {
+        minicbor::decode::Error::message(format!("failed to add args: {}", e.to_string()))
+    })?;
 
-        func.call_arg(args).catch(&ctx).map_err(|e| {
-            minicbor::decode::Error::message(format!("failed to call function: {}", e.to_string()))
-        })
+    let func: rquickjs::Function = ctx.globals().get(fn_name).catch(&ctx).map_err(|e| {
+        minicbor::decode::Error::message(format!("failed to get function: {}", e.to_string()))
+    })?;
+
+    let _: rquickjs::Value = func.call_arg(args).catch(&ctx).map_err(|e| {
+        minicbor::decode::Error::message(format!("failed to call function: {}", e.to_string()))
     })?;
 
     Ok(())
 }
 
-fn run_load_module_byte_code(
+fn run_load_module_byte_code<'js>(
     bytecode: &[u8],
-    ctx: &Context,
-) -> Result<(), minicbor::decode::Error> {
-    _ = ctx.with(|ctx| -> Result<(), minicbor::decode::Error> {
-        _ = unsafe { Module::load(ctx.clone(), bytecode) }
-            .catch(&ctx)
-            .map_err(|e| {
-                minicbor::decode::Error::message(format!("failed load bytecode: {}", e.to_string()))
-            })?
-            .eval()
-            .catch(&ctx)
-            .map_err(|e| {
-                minicbor::decode::Error::message(format!("failed eval bytecode: {}", e.to_string()))
-            })?;
-        Ok(())
-    })?;
+    ctx: &Ctx<'js>,
+) -> cbor::rquickjs::decode::Result<'js, ()> {
+    let m = unsafe { Module::load(ctx.clone(), bytecode) }.catch(&ctx)?;
+    _ = m.eval().catch(&ctx)?;
 
     Ok(())
 }
 
-fn cbor_decode_run_load_module_js(
+fn cbor_decode_run_load_module_js<'js>(
     decoder: &mut Decoder,
-    ctx: &Context,
-) -> Result<(), minicbor::decode::Error> {
+    ctx: &Ctx<'js>,
+) -> cbor::rquickjs::decode::Result<'js, ()> {
     cbor::utils::array_fixed_length(decoder, 2)?;
 
     let module_name = decoder.str()?;
     let module_code = decoder.bytes()?;
 
-    _ = ctx.with(|ctx| -> Result<(), minicbor::decode::Error> {
-        Module::declare(ctx.clone(), module_name, module_code)
-            .catch(&ctx)
-            .map_err(|e| {
-                minicbor::decode::Error::message(format!(
-                    "failed load module code: {}",
-                    e.to_string()
-                ))
-            })?
-            .eval()
-            .catch(&ctx)
-            .map_err(|e| {
-                minicbor::decode::Error::message(format!(
-                    "failed eval module code: {}",
-                    e.to_string()
-                ))
-            })?;
-        Ok(())
-    })?;
+    let m = Module::declare(ctx.clone(), module_name, module_code).catch(&ctx)?;
+
+    _ = m.eval().catch(&ctx)?;
 
     Ok(())
 }
 
-fn cbor_decode_run_call_module_function(
+fn cbor_decode_run_call_module_function<'js>(
     decoder: &mut Decoder,
-    ctx: &Context,
-) -> Result<(), minicbor::decode::Error> {
+    ctx: &Ctx<'js>,
+) -> cbor::rquickjs::decode::Result<'js, ()> {
     cbor::utils::array_fixed_length(decoder, 3)?;
 
     let module_name = decoder.str()?;
     let fn_name = decoder.str()?;
 
-    _ = ctx.with(|ctx| -> Result<(), minicbor::decode::Error> {
-        let arguments: Vec<rquickjs::Value> =
-            cbor::rquickjs::args::array(&ctx, decoder).map_err(|e| {
-                minicbor::decode::Error::message(format!(
-                    "failed to deserialize arguments: {}",
-                    e.to_string()
-                ))
-            })?;
-
-        let mut args = Args::new(ctx.clone(), arguments.len());
-        args.push_args(arguments).map_err(|e| {
-            minicbor::decode::Error::message(format!("failed to add args: {}", e.to_string()))
+    let arguments: Vec<rquickjs::Value> =
+        cbor::rquickjs::args::array(&ctx, decoder).map_err(|e| {
+            minicbor::decode::Error::message(format!(
+                "failed to deserialize arguments: {}",
+                e.to_string()
+            ))
         })?;
 
-        let m: rquickjs::Object = Module::import(&ctx, module_name)
-            .catch(&ctx)
-            .map_err(|e| {
-                minicbor::decode::Error::message(format!(
-                    "failed to import module: {}",
-                    e.to_string()
-                ))
-            })?
-            .finish()
-            .catch(&ctx)
-            .map_err(|e| {
-                minicbor::decode::Error::message(format!(
-                    "failed to finish module import: {}",
-                    e.to_string()
-                ))
-            })?;
+    let mut args = Args::new(ctx.clone(), arguments.len());
+    args.push_args(arguments).map_err(|e| {
+        minicbor::decode::Error::message(format!("failed to add args: {}", e.to_string()))
+    })?;
 
-        let func: rquickjs::Function = m.get(fn_name).catch(&ctx).map_err(|e| {
-            minicbor::decode::Error::message(format!("failed to get function: {}", e.to_string()))
+    let m: rquickjs::Object = Module::import(&ctx, module_name)
+        .catch(&ctx)
+        .map_err(|e| {
+            minicbor::decode::Error::message(format!("failed to import module: {}", e.to_string()))
+        })?
+        .finish()
+        .catch(&ctx)
+        .map_err(|e| {
+            minicbor::decode::Error::message(format!(
+                "failed to finish module import: {}",
+                e.to_string()
+            ))
         })?;
 
-        func.call_arg(args).catch(&ctx).map_err(|e| {
-            minicbor::decode::Error::message(format!("failed to call function: {}", e.to_string()))
-        })
+    let func: rquickjs::Function = m.get(fn_name).catch(&ctx).map_err(|e| {
+        minicbor::decode::Error::message(format!("failed to get function: {}", e.to_string()))
+    })?;
+
+    let _: rquickjs::Value = func.call_arg(args).catch(&ctx).map_err(|e| {
+        minicbor::decode::Error::message(format!("failed to call function: {}", e.to_string()))
     })?;
 
     Ok(())
 }
 
-pub(crate) fn cbor_decode_run_load(
+pub(crate) fn cbor_decode_run_load<'js>(
     decoder: &mut Decoder,
-    ctx: &Context,
-) -> Result<(), minicbor::decode::Error> {
+    ctx: &Ctx<'js>,
+) -> cbor::rquickjs::decode::Result<'js, ()> {
     for _ in 0..cbor::utils::array_length(decoder)? {
         let b = decoder.bytes()?;
         if let Some(h) = b.get(0) {
             match h {
                 &LOAD_EVAL => {
-                    run_load_eval(&b[1..], ctx)?;
+                    cbor_decode_run_load_eval(&mut Decoder::new(&b[1..]), ctx)?;
                 }
                 &LOAD_EVAL_FORMAT => {
                     cbor_decode_run_load_eval_format(&mut Decoder::new(&b[1..]), ctx)?;

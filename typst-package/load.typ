@@ -6,8 +6,12 @@
 /// ctxjs.load.eval("function fn() {}")
 /// ```
 /// -> bytes
-#let eval(js) = {
-  _internal.build-load-argument(_internal.load-eval, bytes(js))
+#let eval(js, strict: true) = {
+  let js = bytes(js)
+  _internal.build-load-argument(
+    _internal.load-eval,
+    _internal.create-cbor-type-with-len-bytes(_internal.cbor-bytes-type, js.len()) + js,
+  )
 }
 
 /// Creates load bytes for @ctxjs.new-context or @ctx.load.
@@ -16,7 +20,7 @@
 /// ctxjs.load.eval-format("function() {return value;}", value: 1)
 /// ```
 /// -> bytes
-#let eval-format(js, ..args) = {
+#let eval-format(js, ..args, strict: true) = {
   _internal.build-load-argument(_internal.load-eval-format, cbor.encode((js, args.named())))
 }
 

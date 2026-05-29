@@ -91,6 +91,10 @@ fn cbor_none() -> Vec<u8> {
     vec![0xE0 | 22]
 }
 
+fn run_load<'js>(decoder: &mut Decoder, ctx: &Context) -> Result<(), String> {
+    ctx.with(|ctx| cbor_decode_run_load(decoder, &ctx).map_err(|err| err.to_string()))
+}
+
 #[wasm_func]
 fn new_context(load: &[u8]) -> Result<Vec<u8>, String> {
     let runtime =
@@ -99,7 +103,7 @@ fn new_context(load: &[u8]) -> Result<Vec<u8>, String> {
     let ctx: Context = Context::full(&runtime)
         .map_err(|e| format!("failed to create context: {}", e.to_string()))?;
 
-    cbor_decode_run_load(&mut Decoder::new(load), &ctx)
+    run_load(&mut Decoder::new(load), &ctx)
         .map_err(|e| format!("failed to run load: {}", e.to_string()))?;
 
     set_current_context(ctx);
@@ -119,7 +123,7 @@ fn load(run: &[u8], catch: &[u8]) -> Result<Vec<u8>, String> {
     catch_error(catch, true, || {
         let ctx = get_current_context()?;
 
-        cbor_decode_run_load(&mut Decoder::new(run), &ctx)
+        run_load(&mut Decoder::new(run), &ctx)
             .map_err(|e| format!("failed to run load: {}", e.to_string()))
             .map(|_| cbor_none())
     })

@@ -8,7 +8,7 @@ use crate::cbor;
 pub(crate) fn array<'js>(
     ctx: &Ctx<'js>,
     decoder: &mut Decoder,
-) -> Result<Vec<Value<'js>>, minicbor::decode::Error> {
+) -> cbor::rquickjs::decode::Result<'js, Vec<Value<'js>>> {
     let len = cbor::utils::array_length(decoder)?;
     let mut array = Vec::with_capacity(len as _);
     for _ in 0..len {
@@ -18,7 +18,7 @@ pub(crate) fn array<'js>(
 }
 pub(crate) fn string_map<'js, 'd>(
     decoder: &'d mut Decoder,
-) -> Result<HashMap<&'d str, String>, minicbor::decode::Error> {
+) -> cbor::rquickjs::decode::Result<'js, HashMap<&'d str, String>> {
     let len = cbor::utils::map_length(decoder)?;
     let mut map = HashMap::with_capacity(len as _);
     for _ in 0..len {
