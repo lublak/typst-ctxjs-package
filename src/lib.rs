@@ -68,7 +68,7 @@ where
                 .map(1)
                 .map_err(|e| format!("failed to serialize error: {}", e.to_string()))?;
             encoder
-                .str("error")
+                .str("ctxjs_error")
                 .map_err(|e| format!("failed to serialize error: {}", e.to_string()))?;
             encoder
                 .str(&err)

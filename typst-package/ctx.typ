@@ -15,7 +15,7 @@
   /// load bytes `created by ctxjs.load.*`
   /// -> bytes
   ..load,
-  /// if all errors should be catched and return as an dictionary(err:str)
+  /// if all errors should be catched and return as an dictionary (ctxjs_error:str)
   /// -> bool
   catch: false,
 ) = {
@@ -43,7 +43,7 @@
   /// if a new context should be created (with changed data)
   /// -> bool
   transition: false,
-  /// if all errors should be catched and return as an dictionary(err:str)
+  /// if all errors should be catched and return as an dictionary (ctxjs_error:str)
   /// -> bool
   catch: false,
 ) = {
@@ -78,7 +78,7 @@
   /// if a new context should be created (with changed data)
   /// -> bool
   transition: false,
-  /// if all errors should be catched and return as an dictionary(err:str)
+  /// if all errors should be catched and return as an dictionary (ctxjs_error:str)
   /// -> bool
   catch: false,
 ) = {
@@ -107,7 +107,7 @@
   /// the context in which this function should run
   /// -> any
   ..vars,
-  /// if all errors should be catched and return as an dictionary(err:str)
+  /// if all errors should be catched and return as an dictionary (ctxjs_error:str)
   /// -> bool
   catch: false,
 ) = {
@@ -144,7 +144,7 @@
   /// if a new context should be created (with changed data)
   /// -> bool
   transition: false,
-  /// if all errors should be catched and return as an dictionary(err:str)
+  /// if all errors should be catched and return as an dictionary (ctxjs_error:str)
   /// -> bool
   catch: false,
 ) = {
@@ -174,7 +174,7 @@
   /// the bytecode mostly created by the @ctxjs_module_bytecode_builder
   /// -> bytes
   bytecode,
-  /// if all errors should be catched and return as an dictionary(err:str)
+  /// if all errors should be catched and return as an dictionary (ctxjs_error:str)
   /// -> bool
   catch: false,
 ) = {
@@ -203,7 +203,7 @@
   /// the js module code
   /// -> str | bytes
   module,
-  /// if all errors should be catched and return as an dictionary(err:str)
+  /// if all errors should be catched and return as an dictionary (ctxjs_error:str)
   /// -> bool
   catch: false,
 ) = {
@@ -249,7 +249,7 @@
   /// if a new context should be created (with changed data)
   /// -> bool
   transition: false,
-  /// if all errors should be catched and return as an dictionary(err:str)
+  /// if all errors should be catched and return as an dictionary (ctxjs_error:str)
   /// -> bool
   catch: false,
 ) = {
@@ -284,7 +284,7 @@
   /// the module name
   /// -> str
   modulename,
-  /// if all errors should be catched and return as an dictionary(err:str)
+  /// if all errors should be catched and return as an dictionary (ctxjs_error:str)
   /// -> bool
   catch: false,
 ) = {
@@ -319,7 +319,7 @@
   /// the property name
   /// -> str
   propertyname,
-  /// if all errors should be catched and return as an dictionary(err:str)
+  /// if all errors should be catched and return as an dictionary (ctxjs_error:str)
   /// -> bool
   catch: false,
 ) = {

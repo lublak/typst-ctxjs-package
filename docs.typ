@@ -234,3 +234,12 @@ This is possible via the value module.
 #ctx.eval-format(current-context, "pure_json({test})", test: value.json("{\"arr\":[1,2,3,4]}"))
 ```
 
+=== catch syntax errors
+
+Sometimes your code doesn't work and can not be catched via javascript build in try and catch.
+If you want to catch the error and still build the typst document, you can use the catch flag.
+You now get an object with an `ctxjs_error` field which contains the error message.
+
+```example
+#ctx.eval(current-context, "function invalid_syntax(;", catch: true)
+```
