@@ -52,13 +52,6 @@ value gets ignored
 
 A full documentation can be found here: [docs.pdf](https://raw.githubusercontent.com/lublak/typst-ctxjs-package/refs/tags/v0.5.0/docs.pdf)
 
-### Changelog
-
-#### 0.5.0
-#### 0.4.1
-#### 0.4.0
-#### 0.1.0
-
 ## An actively used package
 
 To get a picture what is possible with ctxjs there is a package based on echarts embedded into typst.
